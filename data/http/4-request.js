@@ -30,10 +30,71 @@ NETV.addSteps('http', [
     ]
   },
   {
-    id: 'encapsulation-down',
+    id: 'wrap-tcp',
     phase: 'HTTP',
-    title: 'One header stacked on another on the way down',
-    say: 'Each layer wraps the message in its own envelope, and none of them reads inside.',
+    title: 'TCP adds its header and numbers the bytes',
+    say: 'The request is wrapped in a segment and its bytes are numbered.',
+    actor: 'client',
+    dir: 'none',
+    osi: [7, 4],
+    pdu: 'TCP segment',
+    payload: 'the HTTP request message',
+    fields: {
+      tcp: { srcPort: 49152, dstPort: 80, seq: '0x1a2b3c4e', ack: '0x5e6f7082', flags: 'PSH, ACK', window: 65535 },
+      http: {
+        startLine: 'GET / HTTP/1.1',
+        Host: 'daffapn.my.id',
+        'User-Agent': 'Mozilla/5.0',
+        Accept: 'text/html,application/xhtml+xml',
+        'Accept-Encoding': 'gzip, deflate, br',
+        Connection: 'keep-alive'
+      }
+    },
+    explain: 'The bytes the application wrote are handed down to TCP, which treats them as raw data and puts its own header in front of them: the two port numbers that name the two programs, the sequence number of the first byte in this segment, an acknowledgement for the bytes it has received from the other side, and the push flag that asks for the data to be handed up as soon as it lands. TCP never reads the request text, so changing the request would not change this header. The 163-byte request fits in one segment, so nothing is split here.',
+    analogy: 'Each office adds its own cover sheet to a document without reading it.',
+    changes: ['A 20-byte TCP header goes in front of the 163 request bytes', 'The ports name the programs; the sequence number counts the bytes'],
+    cite: [
+      { rfc: 9293, sec: '3.7', title: 'Segmentation' },
+      { rfc: 9293, sec: '3.1', title: 'Header Format' }
+    ]
+  },
+  {
+    id: 'wrap-ip',
+    phase: 'HTTP',
+    title: 'IP adds the addresses that can cross networks',
+    say: 'IP writes the two addresses and a limit on how far to go.',
+    actor: 'client',
+    dir: 'none',
+    osi: [7, 4, 3],
+    pdu: 'IP packet',
+    payload: 'the TCP segment',
+    fields: {
+      ip: { version: 4, headerLength: 20, ttl: 64, protocol: '6 (TCP)', src: '192.168.1.87', dst: '203.0.113.80' },
+      tcp: { srcPort: 49152, dstPort: 80, seq: '0x1a2b3c4e', ack: '0x5e6f7082', flags: 'PSH, ACK', window: 65535 },
+      http: {
+        startLine: 'GET / HTTP/1.1',
+        Host: 'daffapn.my.id',
+        'User-Agent': 'Mozilla/5.0',
+        Accept: 'text/html,application/xhtml+xml',
+        'Accept-Encoding': 'gzip, deflate, br',
+        Connection: 'keep-alive'
+      }
+    },
+    explain: 'The segment is handed down once more, and IP puts its own header in front of it: the version and the header length, the source address of the machine sending it, the destination address of the server, the protocol number that tells the far side a TCP segment is inside, and a limit on how many routers the packet may still cross. IP does not read the segment either; it moves a block of bytes between networks. This is the first header that means anything outside the local link.',
+    analogy: 'A courier writes the sender and the destination on the outside of the parcel.',
+    changes: ['A 20-byte IP header goes in front of the segment', 'TTL starts at 64: every router that forwards it takes one away'],
+    note: 'Nothing here knows the route: the addresses say where the packet must go, and each router decides the next hop on its own.',
+    cite: [
+      { rfc: 791, sec: '3.1', title: 'Internet Header Format' },
+      { rfc: 791, sec: '2.2', title: 'Model of Operation' },
+      { rfc: 1122, sec: '1.1.3', title: 'Internet Protocol Suite' }
+    ]
+  },
+  {
+    id: 'wrap-frame',
+    phase: 'HTTP',
+    title: 'Ethernet adds the two local hardware addresses',
+    say: 'The frame carries the hardware address of the very next device.',
     actor: 'client',
     hop: ['client', 'ap'],
     dir: 'out',
@@ -52,19 +113,13 @@ NETV.addSteps('http', [
         Connection: 'keep-alive'
       }
     },
-    explain: 'The byte stream is handed down one layer at a time, and each layer adds its own header before passing the result to the layer below. The lower layer never looks inside what it is carrying: TCP treats the HTTP bytes as raw data, and IP treats the TCP segment as raw data. TCP splits the stream into segments and gives each a sequence number; IP adds the source and destination addresses and a TTL; Ethernet adds the MAC addresses and a trailing frame check. The network card finally turns the frame into electrical or radio bits on the wire.',
-    analogy: 'Each office adds its own cover sheet to a document without reading it, then passes the pile along.',
-    changes: [
-      'HTTP message wrapped into a TCP segment',
-      'Segment wrapped into an IP packet',
-      'Packet wrapped into an Ethernet frame',
-      'Ethernet frame becomes bits on the medium'
-    ],
-    note: 'The payload bytes never change while the packet is in flight — only the headers do. Sending a request adds four nested addresses before a single bit leaves the host.',
+    explain: 'The last header is the one only this link can read: the hardware address of the next device, the hardware address of the sending card, a type field that marks the contents as an IPv4 packet, and a check at the end of the frame. The network card turns the frame into signals on the wire, and the switch reads only these addresses to decide which port to send it out of. This is where the first hop ends, and a router rebuilds this header from scratch at every hop after it.',
+    analogy: 'A relay runner reads only the next hand-off, not the message being carried.',
+    changes: ['An Ethernet header and a trailing check go around the packet', 'These addresses name this link only, so every hop builds a new frame'],
+    note: 'The payload bytes never change while the packet is in flight — only the headers do.',
     cite: [
-      { rfc: 9293, sec: '3.7', title: 'Segmentation' },
-      { rfc: 791, sec: '3.1', title: 'Internet Header Format' },
       { rfc: 894, sec: 'Frame Format', title: 'Frame Format' },
+      { rfc: 894, sec: 'Address Mappings', title: 'Address Mappings' },
       { rfc: 1122, sec: '1.1.3', title: 'Internet Protocol Suite' }
     ]
   },

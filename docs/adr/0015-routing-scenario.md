@@ -1,10 +1,34 @@
 # 0015 — A routing scenario: OSPF inside an AS, BGP between ASes
 
-* Status: **proposed — not implemented.** No data file, no engine change and no scenario ships with
-  this ADR. It is the specification to build from later.
+* Status: **accepted and implemented.** Two data files (`data/routing/1-ospf.js`,
+  `data/routing/2-bgp.js`), the scenario's two maps in `data/scenario-routing.js`, and the shared
+  code it needed: the `ospf` and `bgp` catalogues, per-chapter boards, and a routing derivation that
+  no longer leans on one scenario's node ids.
 * Date: 2026-10-14
 * Deciders: user (asked for the routing mechanisms to be walked through the way HTTP is)
 * Builds on: 0001 (full-path scope), 0006 (declarative steps), 0012 (chapters), 0014 (vocabulary)
+
+## What shipped, and where it differs from the proposal above
+
+* **Two canvases, not one.** The user asked for OSPF and BGP to work on separate maps, so a
+  scenario may now declare `boards: { <phase>: { nodes, links, aria } }` and each chapter is drawn
+  on its own canvas (data schema §1). BGP's map carries the routers the HTTP walkthrough crossed —
+  `gw`, `isp`, `transit`, `edge`, `server` keep their ids, addresses and notes — so the second
+  chapter reads as the same story, and its closing step forwards the very packet the first
+  walkthrough sent, arriving with the TTL 60 that story ends on.
+* **The open question about "is this packet routed" is answered by derivation, not by node ids.**
+  The page shows a remaining TTL when a router is on the hop, and drops it only at routers strictly
+  between the two ends of that hop: the node the packet comes from has not forwarded it yet, and the
+  node it arrives at is receiving it. An OSPF hello therefore keeps its `ttl: 1` to the end of its
+  one hop instead of looking expired, and HTTP's behaviour is unchanged (checked step by step
+  against the old rule: no step changes what it shows).
+* **Reaching the walkthrough is a tab in the top bar**, built from `NETV.scenarios` in load order,
+  so no second page and no navigation code: `data/scenario-http.js` gained a `nav` label and
+  `data/scenario-routing.js` declares its own.
+* **Everything else in the proposal held**: the two chapters, the nineteen steps and their order,
+  the private AS numbers, the addresses, the multicast delivery of Hellos and floods, the fields and
+  the citations, all of it data. `docs/data-schema.md` §2, §5, §6 and §7 carry the frozen parts.
+
 
 ## Context
 
@@ -152,9 +176,12 @@ multiprotocol extensions. Any of them is another scenario, not another chapter.
 
 ## Open questions
 
-* The `isp`-based "is it routed" derivation in `src/anim.js` (see above) — needs a decision before
-  the first step with a TTL is authored.
-* Whether the routing scenario reuses the HTTP scenario's client/server nodes or declares its own
-  (`server` is shared vocabulary; the laptop is not needed).
-* Whether the two chapters are enough for a reader who has never heard of an autonomous system: an
-  intro step ("what an operator's network is") may belong at the head of the OSPF chapter.
+* **Answered.** The `isp`-based "is it routed" derivation in `src/anim.js` is gone: a hop shows a
+  TTL when a router is on it, and only the routers strictly between the ends of the hop drop it. See
+  *What shipped*.
+* **Answered.** The routing maps reuse the HTTP nodes they need — `gw`, `isp`, `transit`, `edge`,
+  `server` — with the same ids, addresses and notes, and no laptop: the routing walkthrough is about
+  what the routers did, not about what the client sent.
+* **Answered by the preamble, not by a step.** The chapters stay nineteen steps; the scenario's
+  `preamble` says what the two networks are and why neither knew about the other, which is the one
+  thing an intro step would have added.

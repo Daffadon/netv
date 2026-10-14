@@ -2,7 +2,14 @@
 
 A step-by-step visualization of what happens between pressing Enter on `http://daffapn.my.id/` and
 the page appearing: DHCP, DNS, ARP, NAT, the TCP handshake, the HTTP exchange, and the teardown,
-layer by layer and hop by hop. Every step cites the RFC section that defines the behaviour.
+layer by layer and hop by hop. Wrapping gets one step per header, so the packaging of a packet is
+watched a layer at a time and can be stopped at any of them. Every step cites the RFC section that
+defines the behaviour.
+
+A second walkthrough, **Routing**, continues from that same packet: how the provider's routers
+agreed on a map of their own network before any of it could be forwarded (OSPF), and how two
+networks told each other what they can reach (BGP). It is drawn on two canvases, one per protocol,
+and it ends by forwarding the very packet the HTTP walkthrough sent.
 
 ## Run it
 
@@ -19,7 +26,7 @@ a plain static host is enough: there is no SPA fallback rule to write and no Wor
 
 ## Deploy to Cloudflare
 
-The site is 11 static files: `index.html`, `styles.css`, `src/*.js`, `data/*.js`.
+The site is 15 static files: `index.html`, `styles.css`, `src/*.js`, `data/*.js`.
 
 ```sh
 npx wrangler login     # once; in WSL it prints a URL to open in your Windows browser
@@ -62,13 +69,24 @@ for this layout.
 The canvas is the page. It plays itself — press **▶ Play** (or just leave it) and watch one line at
 a time as the packet crosses the network.
 
-Controls: **Play/Pause**, **◀ ▶** for one step at a time, a **speed** button (1× / 1.5× / 2×), the
-three chapter tabs in the top bar (**DHCP** steps 1–6, **DNS** 7–9, **HTTP** 10–26), the 26-segment
+Controls: **Play/Pause**, **◀ ▶** for one step at a time, a **speed** button (0.5× / 1× / 1.5× / 2×), the
+three chapter tabs in the top bar (**DHCP** steps 1–6, **DNS** 7–9, **HTTP** 10–30), the 30-segment
 progress bar along the bottom edge, or the keyboard — `←` `→`, `space`, `Home`, `End`.
 
-* **The canvas** — the map on a dotted field, filling everything under the top bar. Drag it to pan;
-  **− / +**, `ctrl`/`⌘` + wheel, or **Fit** to zoom. At 100% the map fills the width; **Fit** shows
-  the whole of it at once.
+* **The two walkthroughs** — the top bar switches between **HTTP** (30 steps in three chapters) and
+  **Routing** (25 steps in two). Routing is drawn on two canvases: OSPF works inside one provider
+  network — four routers, two of them on one shared segment — and BGP on the two networks and the
+  two links between them, which is what lets a route policy change move the traffic from one link
+  to the other. The step URL carries which walkthrough it belongs to
+  (`#/routing/bgp-open`), so a chapter can be linked to directly.
+* **The canvas** — the map on a dotted field, filling everything under the top bar. Drag it to pan:
+  the map floats in a canvas a little larger than the view, so a drag has somewhere to move it even
+  at 100%, where the map already fits the width. **− / +**, `ctrl`/`⌘` + wheel, or **Fit** to zoom;
+  **Fit** brings the whole map back into view and centres it again. When a step carries figures of
+  its own — a routing table, two offers compared — they are drawn in a column beside the map rather
+  than in the drawer, and stay there for the rest of the chapter with a line saying which step they
+  came from, so the messages that follow the calculation are watched with the figure still in view.
+  On a phone the column moves under the map.
 * **The packet** — it glides from node to node, and every node is drawn as the thing it is: a
   laptop, a switch, a router, a server, a nameserver, not a labelled box. Each layer wraps itself
   around the payload from the inside out, and the destination peels the wrappers back off one at a
@@ -76,12 +94,13 @@ progress bar along the bottom edge, or the keyboard — `←` `→`, `space`, `H
   says how it travels: **unicast** traces the one link it crosses, while **broadcast** and
   **multicast** ring at every station that reads them. When the packet is routed, the TTL ticks down
   and a badge floats off every router it crosses. Parts of the map the story has not reached yet
-  stay dimmed, so the topology is introduced rather than dumped.
+  stay dimmed, so the topology is introduced rather than dumped, and a line the story has to earn —
+  the laptop's address — is not printed until the step that hands it over.
 * **The bar over the canvas** — the transport buttons, the layer rail, and the zoom controls. The
   rail shows the four TCP/IP rows (Application, Transport, Internet, Link) and lights the ones this
   step uses; OSI's Presentation and Session rows are gone, because nothing in the scenario uses them.
 * **The caption line** — one plain sentence above the progress bar, prefixed with the chapter and
-  step number (`DNS · step 9 of 26`), so the story is never watched blind. It is the whole story for
+  step number (`DNS · step 9 of 30`), so the story is never watched blind. It is the whole story for
   somebody who never opens anything.
 * **“Step details”** — a panel that opens over the canvas from the right (a sheet from the bottom on
   a phone). While it is open the map is re-fitted beside it, so nothing is covered. On the first
@@ -111,7 +130,10 @@ src/ui.js                  all DOM rendering; every visual is derived from step 
 src/anim.js                the animation timeline: the packet, the wrapping, the TTL badges,
                            the field-by-field stack and the delivery animation
 data/scenario-http.js      topology, phases, framing text
-data/http/*.js             the 26 steps, one file per phase
+data/http/*.js             the 30 steps, one file per phase
+data/scenario-routing.js   the routing walkthrough's two maps, one per chapter
+data/routing/1-ospf.js     the 10 OSPF steps
+data/routing/2-bgp.js      the 9 BGP steps
 tools/validate.js          schema check — run this after touching any data file
 tools/smoke.mjs            optional: renders the real page in jsdom and drives it
 docs/glossary.md           domain model: the two layer models, PDU names, roles
@@ -123,11 +145,15 @@ docs/adr/                  why the scope, depth, stack and interaction are what 
 
 A new scenario is data, not code. Write `data/<name>.js` calling `NETV.defineScenario({...})`
 with its own nodes, links and phases, add step files that call `NETV.addSteps('<name>', [...])`,
-add the `<script>` tags to `index.html`, and point the boot call at it:
-`NETV.UI.boot('<name>')`. The engine, the layer panel, the nesting of header boxes and the packet
-inspector are all shared — no visual code changes for a second protocol. The animation is derived
-too, so a new protocol moves correctly without touching `src/anim.js`; the delivery animation comes
-with it, because unicast, broadcast and multicast are read off the addresses the step declares.
+add the `<script>` tags to `index.html`, and add its entry to the tables in `tools/validate.js`.
+The engine, the layer panel, the nesting of header boxes and the packet inspector are all shared —
+no visual code changes for a second protocol. The top bar grows a tab for it by itself, in script
+order. The animation is derived too, so a new protocol moves correctly without touching
+`src/anim.js`; the delivery animation comes with it, because unicast, broadcast and multicast are
+read off the addresses the step declares, and the remaining TTL is read off the routers a hop
+passes through. A scenario whose chapters need different maps declares `boards` instead of
+`nodes`/`links` — the routing walkthrough has one canvas per chapter, and `NETV.boardOf` is what
+the engine, the animation and the validator read the map through.
 Every step needs the required fields including `say`, the one plain-language caption — the
 validator rejects a step without one.
 Any data file whose name changes must also be listed in `tools/validate.js`.
@@ -148,7 +174,8 @@ JSDOM_PATH=/tmp/netv-dom/node_modules/jsdom node tools/smoke.mjs
 ```
 
 Optional, and needs `jsdom` installed outside the tree so the page itself stays dependency-free.
-It renders the page over `http://` and from `file://` and walks all 26 steps.
+It renders the page over `http://` and from `file://`, walks all 30 HTTP steps and all 25 routing
+steps, and checks that each chapter is drawn on its own canvas.
 
 ## Accuracy rules
 

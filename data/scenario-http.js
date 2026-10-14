@@ -4,6 +4,7 @@
 
   NETV.defineScenario({
     id: 'http',
+    nav: 'HTTP',
     title: 'HTTP over TCP/IP',
     subtitle: 'What happens when a browser fetches http://daffapn.my.id/ — every layer, every hop, in order.',
     phases: ['DHCP', 'DNS', 'HTTP'],
@@ -12,7 +13,7 @@
     // Labels stay short: they are centred under the glyph, not wrapped. `note` is the plain
     // sentence the drawer legend and the hover tooltip show for it.
     nodes: [
-      { id: 'client', label: 'laptop', sub: '192.168.1.87', x: 60, y: 70, kind: 'host', note: 'your laptop, the device making the request' },
+      { id: 'client', label: 'laptop', sub: '192.168.1.87', subBefore: 'no address yet', subFrom: 'dhcp-request-ack', x: 60, y: 70, kind: 'host', note: 'your laptop, the device making the request' },
       { id: 'ap', label: 'switch / AP', sub: 'layer 2 only', x: 180, y: 70, kind: 'switch', note: 'switch or Wi-Fi point: forwards frames on this link only' },
       { id: 'gw', label: 'home router', sub: '192.168.1.1 · NAT', x: 300, y: 70, kind: 'router', note: 'home router: gives every home device one public address' },
       { id: 'isp', label: 'ISP access', sub: '198.51.100.1', x: 420, y: 70, kind: 'router', note: 'your internet provider: first router past your home' },

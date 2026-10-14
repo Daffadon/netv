@@ -30,15 +30,76 @@ NETV.addSteps('http', [
     ]
   },
   {
-    id: 'response-encapsulated',
+    id: 'response-wrap-tcp',
     phase: 'HTTP',
-    title: 'The response is encapsulated for the wire',
-    say: 'The same wrapping in reverse, with its own byte counter for this direction.',
+    title: 'TCP wraps the response in its own segment',
+    say: 'The reply gets its own byte counter for the other direction.',
     actor: 'server',
-    dir: 'out',
-    osi: [7, 4, 3, 2, 1],
+    dir: 'none',
+    osi: [7, 4],
     pdu: 'TCP segment',
     payload: 'the HTTP response message',
+    fields: {
+      tcp: { srcPort: 80, dstPort: 49152, seq: '0x5e6f7082 (server ISN + 1)', ack: '0x1a2b3cf1 (client ISN + 1 + 163 request bytes)', flags: 'PSH, ACK', window: 65535, dataOffset: 20, checksum: '0x3a7d' },
+      http: {
+        startLine: 'HTTP/1.1 200 OK',
+        'Content-Type': 'text/html; charset=utf-8',
+        'Content-Length': '1256',
+        Date: 'Tue, 13 Oct 2026 21:00:00 GMT',
+        ETag: '"a1b2c3"',
+        Connection: 'keep-alive'
+      }
+    },
+    explain: 'The response bytes are handed to TCP, which numbers them in its own sequence space: the sequence number counts the bytes this server has sent, while the acknowledgement covers the request bytes that arrived from the client. The two directions never share counters, so one side can be far ahead of the other without confusion. Ports, window and checksum are filled in as they were on the way out, and the push flag asks the client to hand the data up as soon as it lands. The 1256-byte body fits in one segment.',
+    analogy: 'Two people keep separate tallies, one for each direction of the conversation.',
+    changes: ['TCP adds a 20-byte header, so the IP payload is 1276 bytes', 'The sequence number counts server bytes; the acknowledgement covers the request'],
+    cite: [
+      { rfc: 9293, sec: '3.7', title: 'Segmentation' },
+      { rfc: 9293, sec: '3.8', title: 'Data Communication' },
+      { rfc: 9112, sec: '6.3', title: 'Message Body Length' }
+    ]
+  },
+  {
+    id: 'response-wrap-ip',
+    phase: 'HTTP',
+    title: 'IP addresses the reply to the home router',
+    say: 'The reply is addressed to the public address the request came from.',
+    actor: 'server',
+    dir: 'none',
+    osi: [7, 4, 3],
+    pdu: 'IP packet',
+    payload: 'the TCP segment',
+    fields: {
+      ip: { version: 4, headerLength: 20, totalLength: 1296, id: '0x7b41', ttl: 64, protocol: '6 (TCP)', checksum: '0x9f2c', src: '203.0.113.80', dst: '198.51.100.23' },
+      tcp: { srcPort: 80, dstPort: 49152, seq: '0x5e6f7082 (server ISN + 1)', ack: '0x1a2b3cf1 (client ISN + 1 + 163 request bytes)', flags: 'PSH, ACK', window: 65535, dataOffset: 20, checksum: '0x3a7d' },
+      http: {
+        startLine: 'HTTP/1.1 200 OK',
+        'Content-Type': 'text/html; charset=utf-8',
+        'Content-Length': '1256',
+        Date: 'Tue, 13 Oct 2026 21:00:00 GMT',
+        ETag: '"a1b2c3"',
+        Connection: 'keep-alive'
+      }
+    },
+    explain: 'The header names the server as the source and the home router as the destination, because that is the address the request arrived from: the laptop\'s own address is private and could not survive a trip across the internet. This is the address the translation table will recognise when the reply gets home, and the private address is put back only at the last hop. The length field covers the whole packet, and the hop limit starts fresh for this journey.',
+    analogy: 'A reply is sent to the front desk that forwarded the letter, not to the room.',
+    changes: ['A 20-byte IP header; total length 1296', 'Destination is 198.51.100.23, the home router, not the laptop'],
+    cite: [
+      { rfc: 791, sec: '3.1', title: 'Internet Header Format' },
+      { rfc: 3022, sec: '2.2', title: 'Overview of NAPT' },
+      { rfc: 1812, sec: '5.3.1', title: 'Time to Live (TTL)' }
+    ]
+  },
+  {
+    id: 'response-wrap-frame',
+    phase: 'HTTP',
+    title: 'The frame leaves the server for the edge router',
+    say: 'The reply leaves the server in a frame built for this datacentre link.',
+    actor: 'server',
+    hop: ['server', 'edge'],
+    dir: 'out',
+    osi: [7, 4, 3, 2, 1],
+    pdu: 'Ethernet frame',
     fields: {
       ethernet: { src: '00:1b:21:3c:4d:5e', type: '0x0800 (IPv4)', fcs: 'valid' },
       ip: { version: 4, headerLength: 20, totalLength: 1296, id: '0x7b41', ttl: 64, protocol: '6 (TCP)', checksum: '0x9f2c', src: '203.0.113.80', dst: '198.51.100.23' },
@@ -52,18 +113,14 @@ NETV.addSteps('http', [
         Connection: 'keep-alive'
       }
     },
-    explain: 'The HTTP message becomes the payload of a TCP segment. TCP numbers these outgoing bytes with its own sequence numbers, and in the same segment it acknowledges the bytes it has received from the client. The two directions have separate sequence spaces and windows, so the acknowledgement here covers only the client-to-server stream. PSH tells the receiving side to hand the data up as soon as it arrives rather than wait for more. The 1256-byte body fits in one segment; a larger body would be split into segments of at most 1460 bytes and put back together at the client from the sequence numbers.',
-    analogy: 'Like packing a gift in a box, where the box carries its own label even though the gift inside already has one.',
-    changes: [
-      'TCP adds a 20-byte header, so the IP payload is 1276 bytes',
-      'IP adds a 20-byte header; total length 1296',
-      'Frame leaves the server with source MAC 00:1b:21:3c:4d:5e'
-    ],
+    explain: 'The frame carries the sending card\'s hardware address, the type that marks an IPv4 packet inside, and a check at the end, and the network card turns it into signals for the datacentre link. The next device reads only these local addresses, picks the outgoing port, and builds a fresh frame for the following link, so the addresses inside the packet are the only ones that stay the same from end to end. The reply now exists as bytes travelling back the way the request came.',
+    analogy: 'A parcel leaves the warehouse with the label the first driver has to read.',
+    changes: ['An Ethernet header and a trailing check, as on every frame', 'The frame is rebuilt at each hop; the packet inside is untouched'],
+    note: 'The scenario does not name the edge router\'s hardware address, so only the server\'s own is shown.',
     cite: [
-      { rfc: 9293, sec: '3.7', title: 'Segmentation' },
-      { rfc: 9293, sec: '3.7.1', title: 'Maximum Segment Size Option' },
-      { rfc: 9293, sec: '3.8', title: 'Data Communication' },
-      { rfc: 9112, sec: '6.3', title: 'Message Body Length' }
+      { rfc: 894, sec: 'Frame Format', title: 'Frame Format' },
+      { rfc: 894, sec: 'Address Mappings', title: 'Address Mappings' },
+      { rfc: 1122, sec: '1.1.3', title: 'Internet Protocol Suite' }
     ]
   },
   {

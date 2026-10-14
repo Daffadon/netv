@@ -1,7 +1,7 @@
 # Domain model & glossary
 
 Shared vocabulary for the visualization. Every term defined here is a term the UI is
-allowed to display. The citation registry in §7 is the only set of sources the app may cite.
+allowed to display. The citation registry in §8 is the only set of sources the app may cite.
 
 Convention used throughout: `RFC nnnn` = the RFC number; a section number is only written
 when it was read from the document itself.
@@ -89,6 +89,14 @@ datacenter edge router · load balancer · origin server · proxy · CDN cache.
 **Forwarding vs local delivery**: a switch rewrites nothing above L2; a router decrements
 TTL, recomputes the L3 checksum and builds a *new* L2 frame for the next hop.
 
+The routing walkthrough reuses those nodes and adds the roles its two maps need: **access router**
+(the provider's router facing the home) · **core router** · **designated router / backup designated
+router** (the two that speak for a shared segment) · **border router** (the edge of one network,
+where the interior protocol stops and the one between networks begins) · **autonomous system** (the
+whole network under one operator, named by an AS number) · **internal peer** and **external peer**
+(two routers of the same network, or of two different ones — the datacentre reaches the provider
+over two links, one front router per link, so the same block can be offered twice).
+
 ## 5. The HTTP exchange (RFC 9110, RFC 9112)
 
 request · response · method (`GET`) · request target · header field · representation ·
@@ -106,7 +114,38 @@ checksum (covers a pseudo-header including the IP addresses) · three-way handsh
 four-way teardown · TIME-WAIT / 2×MSL · RST · retransmission · RTT.
 Header fields exactly as RFC 9293 §3.1 defines them, flags CWR ECE URG ACK PSH RST SYN FIN.
 
-## 7. Citation registry (verified against rfc-editor.org)
+## 7. Routing mechanics (RFC 2328, RFC 4271)
+
+The routing walkthrough's vocabulary, in the two halves its chapters follow.
+
+**Inside one network** (the interior protocol): every router keeps a *link state database*, built by
+flooding rather than by exchanging routes — **link state advertisement** (LSA: how a router describes
+its own links, with an `LS age`, an `LS sequence number` and an `LS checksum` so an old copy can never
+overwrite a newer one) · **Hello** (the repeated greeting that discovers and keeps neighbours —
+`HelloInterval`, `RouterDeadInterval`) · neighbour state **2-Way** (each has heard the other) ·
+**ExStart / Exchange / Loading / Full** (the states the two pass through while they compare and
+complete their databases) · **Database Description** (the table of contents, page by page) ·
+**Link State Request / Update / Acknowledgment** (how the missing entries move, and how the exchange
+is made reliable without TCP) · **Designated Router** and **Backup Designated Router** (one speaker
+per shared segment, so N routers need 2N adjacencies instead of N²) · **flooding** (an entry reaches
+every router in the area) · **area** (the part of the network whose routers share one database; the
+backbone is `0.0.0.0`) · **router ID** (a router's own name, its highest address) · **interface
+output cost** (what one link costs to use, set by the operator) · **shortest path first** (the
+calculation each router runs on the same database) · **convergence** (every router back in step after
+a change).
+
+**Between networks** (the exterior protocol): **autonomous system** (one operator's network, named by
+an AS number) · **prefix** (the block being offered, `203.0.113.0/24`) · **path vector** (a route is
+a prefix plus the list of networks it passed through) · **external / internal peer** (`eBGP` / `iBGP`)
+· **OPEN**, **UPDATE**, **KEEPALIVE**, **NOTIFICATION** (the four messages; the session itself runs
+over TCP port 179) · **NLRI** (the addresses an update makes reachable) · **path attributes**:
+`ORIGIN`, `AS_PATH` (the sender prepends its own AS), `NEXT_HOP`, `LOCAL_PREF`, `MULTI_EXIT_DISC` ·
+**decision process** (highest `LOCAL_PREF`, shortest `AS_PATH`, lowest `ORIGIN`, lowest `MED`, external
+before internal peer, lowest interior cost to `NEXT_HOP`, lowest router identity) · **route withdrawal**
+· **policy** (nothing forces a router to accept an offer). The two halves meet at `NEXT_HOP`: an
+exterior route is usable only while the interior protocol can still reach that address.
+
+## 8. Citation registry (verified against rfc-editor.org)
 
 | RFC | Title | Status | Cited for |
 |---|---|---|---|
@@ -116,11 +155,13 @@ Header fields exactly as RFC 9293 §3.1 defines them, flags CWR ECE URG ACK PSH 
 | 1035 | Domain Names — Implementation and Specification | STD 13 | DNS message format, labels |
 | 1122 | Requirements for Internet Hosts — Communication Layers | STD 3 | the 4-layer model (§1.1.3) |
 | 2131 | Dynamic Host Configuration Protocol | Draft Std | how a host gets its IP/gateway |
+| 2328 | OSPF Version 2 | STD 54 | the map inside one network: hello, adjacency, LSA flooding, shortest path |
 | 3022 | Traditional IP Network Address Translator (Traditional NAT) | Informational | NAT at the home router |
 | 3168 | The Addition of Explicit Congestion Notification (ECN) to IP | Standards Track | CWR/ECE flags |
-| 4271 | A Border Gateway Protocol 4 (BGP-4) | Standards Track | inter-AS routing |
+| 4271 | A Border Gateway Protocol 4 (BGP-4) | Standards Track | inter-AS routing: the session over TCP, OPEN/UPDATE/KEEPALIVE/NOTIFICATION, path attributes, the decision process |
 | 4987 | TCP SYN Flooding Attacks and Common Mitigations | Informational | SYN cookies, backlog |
 | 6891 | Extension Mechanisms for DNS (EDNS(0)) | STD 75 | DNS over UDP size |
+| 6996 | Private Use AS Numbers | BCP 6 | the 64512–65534 range the walkthrough's two networks use |
 | 8200 | Internet Protocol, Version 6 (IPv6) Specification | STD 86 | IPv6 header |
 | 8446 | The Transport Layer Security (TLS) Protocol Version 1.3 | Standards Track | (out of scope) |
 | 9110 | HTTP Semantics | STD 97 | methods, status, headers, URI |

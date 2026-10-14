@@ -43,7 +43,11 @@
   function attach(svg, stack) {
     stackHost = stack;
     links = svg.querySelectorAll('.link');
-    for (const n of NETV.Engine.scenario().nodes) {
+    nodeXY = {};
+    nodeKind = {};
+    // The map of the chapter currently on screen: a scenario may draw a different canvas per phase.
+    const board = NETV.boardOf(NETV.Engine.scenario(), NETV.Engine.current().phase);
+    for (const n of board.nodes) {
       nodeXY[n.id] = { x: n.x, y: n.y };
       nodeKind[n.id] = n.kind;
     }
@@ -104,6 +108,26 @@
   // Which header is on the outside, and which key is the payload's own label.
   function headersOf(step) {
     return NETV.HEADER_ORDER.filter((k) => step.fields && step.fields[k]);
+  }
+
+  /**
+   * Whether this hop shows a remaining TTL at all: something on the hop is a router, so the packet
+   * is travelling between networks. A broadcast never leaves its link, so it never shows one.
+   */
+  function routed(step) {
+    if (!step.hop || step.hop.length < 2 || NETV.delivery(step) === 'broadcast') return false;
+    return step.hop.some((id) => nodeKind[id] === 'router');
+  }
+
+  /**
+   * The routers on this hop whose work costs the packet a TTL: the ones strictly between the ends.
+   * The node it comes from has not forwarded it yet, and the node it arrives at is receiving it,
+   * not passing it on - so an OSPF hello read by its neighbour keeps the TTL it was sent with.
+   * Derived from the data: no step declares this.
+   */
+  function forwarders(step) {
+    if (!step.hop || step.hop.length < 3 || NETV.delivery(step) === 'broadcast') return [];
+    return step.hop.slice(1, -1).filter((id) => nodeKind[id] === 'router');
   }
 
   // Build the nested outlines for this step: outermost header first. Each header also gets a row
@@ -227,7 +251,8 @@
 
     const traveling = !!(step.hop && step.hop.length > 1);
     const arriving = step.dir === 'in';
-    const routed = !!(step.hop && step.hop.includes('isp'));
+    const fwd = new Set(forwarders(step));
+    const showsTtl = routed(step);
     const mode = NETV.delivery(step);
     delivery(mode);
     let t = 0;
@@ -254,9 +279,9 @@
       headers.forEach((k) => reveal(k, true));
     }
 
-    // 2. travel, one hop at a time, dropping the TTL at every router
+    // 2. travel, one hop at a time, dropping the TTL at every router that forwards it
     let ttl = step.fields.ip && typeof step.fields.ip.ttl === 'number' ? step.fields.ip.ttl : null;
-    if (ttl !== null && routed && traveling) setTtl('TTL ' + ttl);
+    if (ttl !== null && showsTtl && traveling) setTtl('TTL ' + ttl);
     else setTtl(null);
 
     if (traveling) {
@@ -267,7 +292,7 @@
         later(() => {
           place(node, true);
           flow(from, node, mode, life);
-          if (routed && nodeKind[node] === 'router' && ttl !== null) {
+          if (fwd.has(node) && ttl !== null) {
             ttl--;
             setTtl('TTL ' + ttl);
             failBadge(node, '−1');
@@ -298,10 +323,9 @@
     chipText.textContent = headers.length ? NETV.HEADER_CHIP[headers[headers.length - 1]] : '';
     const ip = step.fields && step.fields.ip;
     const ttl = ip && typeof ip.ttl === 'number' ? ip.ttl : null;
-    if (ttl !== null && step.hop && step.hop.includes('isp')) {
-      const crossings = step.hop.filter((n) => nodeKind[n] === 'router').length;
-      setTtl('TTL ' + Math.max(0, ttl - crossings));
-    } else {
+    const crossed = forwarders(step).length;
+    if (ttl !== null && routed(step)) setTtl('TTL ' + Math.max(0, ttl - crossed));
+    else {
       setTtl(null);
     }
     if (!step.hop || !step.hop.length) packet.classList.add('hidden');

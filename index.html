@@ -10,8 +10,9 @@
 
 <header class="topbar">
   <span class="brand">netv</span>
-  <span class="tagline" id="tagline"></span>
+  <nav class="phases" id="scenarios" aria-label="Walkthroughs"></nav>
   <nav class="phases" id="phases" aria-label="Chapters"></nav>
+  <span class="tagline" id="tagline"></span>
 </header>
 
 <main class="app" id="app">
@@ -33,9 +34,14 @@
       </div>
     </div>
 
-    <div class="board-scroll" id="board-scroll">
-      <svg id="topology" viewBox="0 0 860 320" role="img"
-           aria-label="The path from your device through the home router, the ISP and the backbone to the server, plus the DNS server hierarchy."></svg>
+    <div class="board-stage">
+      <aside class="board-table" id="board-table" aria-label="The figures this step is read on" hidden></aside>
+      <div class="board-scroll" id="board-scroll">
+        <div class="board-canvas" id="board-canvas">
+          <svg id="topology" viewBox="0 0 860 320" role="img"
+               aria-label="The map of the network this walkthrough follows."></svg>
+        </div>
+      </div>
     </div>
 
     <div class="packet-stack" id="stack" aria-hidden="true"></div>
@@ -66,6 +72,9 @@
 <script src="data/http/3-connect.js"></script>
 <script src="data/http/4-request.js"></script>
 <script src="data/http/5-response.js"></script>
+<script src="data/scenario-routing.js"></script>
+<script src="data/routing/1-ospf.js"></script>
+<script src="data/routing/2-bgp.js"></script>
 <script src="src/engine.js"></script>
 <script src="src/anim.js"></script>
 <script src="src/ui.js"></script>

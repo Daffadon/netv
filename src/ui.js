@@ -5,11 +5,12 @@
   const Anim = NETV.Anim;
   const SVGNS = 'http://www.w3.org/2000/svg';
 
-  const DIR_WORD = { out: 'leaving your device', in: 'arriving at your device', none: 'happening inside one machine' };
+  const DIR_WORD = { out: 'leaving its sender', in: 'arriving at its receiver', none: 'happening inside one machine' };
 
-  let svg, railHost, tickHost, nodeEls = {}, linkEls = [];
+  let svg, railHost, tickHost, nodeEls = {}, linkEls = [], subEls = {};
   let knownAt = [];        // per step index: the set of nodes the story has already used
   let lastStep = null, lastSpeed = null, wasPlaying = false, advanceTimer = null;
+  let lastScenarioId = null, lastBoard = null;
 
   function el(tag, cls, text) {
     const n = document.createElement(tag);
@@ -26,23 +27,66 @@
 
   // ---------- board: drag to pan, zoom the map around the middle of the view ----------
 
-  let board, boardScroll, zoomLabel;
+  let board, boardScroll, boardCanvas, zoomLabel;
   let zoom = 1;             // 1 = the whole map fits the width
   let zoomed = false;       // true once the user has zoomed, so resize stops re-fitting
+  const SLOP = .1;          // share of the view the map can be dragged by, on each side
+
+  /**
+   * The map floats in a canvas a little bigger than the view box, so a drag always has somewhere
+   * to move it — at 100% the map already fits the width, and without the slack the pan would be
+   * dead. The map stays centred in that canvas, and the canvas grows with the map as it zooms.
+   */
+  function layoutCanvas() {
+    const w = boardScroll.clientWidth, h = boardScroll.clientHeight;
+    if (!w || !h) return;              // nothing measured yet: leave the map as it is
+    const mapW = zoom * w;
+    const mapH = mapW * (320 / 860);
+    const boxW = Math.max(mapW + 2 * w * SLOP, w * (1 + SLOP));
+    const boxH = Math.max(mapH + 2 * h * SLOP, h * (1 + SLOP));
+    boardCanvas.style.width = boxW + 'px';
+    boardCanvas.style.height = boxH + 'px';
+    svg.style.left = (boxW - mapW) / 2 + 'px';
+    svg.style.top = (boxH - mapH) / 2 + 'px';
+  }
+
+  /** Which point of the canvas sits under the middle of the view, as fractions of the whole. */
+  function viewCentre() {
+    const w = boardScroll.scrollWidth || 1, h = boardScroll.scrollHeight || 1;
+    return {
+      x: (boardScroll.scrollLeft + boardScroll.clientWidth / 2) / w,
+      y: (boardScroll.scrollTop + boardScroll.clientHeight / 2) / h
+    };
+  }
+
+  function scrollToCentre(c) {
+    boardScroll.scrollLeft = c.x * boardScroll.scrollWidth - boardScroll.clientWidth / 2;
+    boardScroll.scrollTop = c.y * boardScroll.scrollHeight - boardScroll.clientHeight / 2;
+  }
 
   function applyZoom() {
     svg.style.width = zoom * 100 + '%';
+    layoutCanvas();
     zoomLabel.textContent = Math.round(zoom * 100) + '%';
   }
 
   /**
    * Show the whole map: 100% fills the width, and if the canvas is shorter than the map's own
-   * proportion it shrinks until the whole map is in view again.
+   * proportion it shrinks until the whole map is in view again. The map is centred in its canvas.
    */
   function fit() {
     zoomed = false;
     zoom = Math.min(1, boardScroll.clientHeight / (boardScroll.clientWidth * (320 / 860))) || 1;
     applyZoom();
+    scrollToCentre({ x: .5, y: .5 });
+  }
+
+  /** After the view box changes shape, keep the same part of the map under the middle. */
+  function relayout() {
+    const c = viewCentre();
+    if (!zoomed) { fit(); return; }
+    layoutCanvas();
+    scrollToCentre(c);
   }
 
   function zoomBy(factor) {
@@ -62,6 +106,7 @@
   function wireBoard() {
     board = document.getElementById('board');
     boardScroll = document.getElementById('board-scroll');
+    boardCanvas = document.getElementById('board-canvas');
     zoomLabel = document.getElementById('zoom-level');
 
     let drag = null;
@@ -92,13 +137,13 @@
     document.getElementById('btn-zoom-in').addEventListener('click', () => zoomBy(1.25));
     document.getElementById('btn-zoom-out').addEventListener('click', () => zoomBy(1 / 1.25));
     document.getElementById('btn-zoom-fit').addEventListener('click', fit);
-    global.addEventListener('resize', () => { if (!zoomed) fit(); });
+    global.addEventListener('resize', relayout);
 
     // Opening the panel takes width from the canvas, so the map is fitted into what is left.
     const drawer = document.getElementById('drawer');
     drawer.addEventListener('toggle', () => {
       board.parentNode.classList.toggle('drawer-open', drawer.open);
-      if (!zoomed) fit();
+      relayout();
     });
 
     setTimeout(fit, 0);       // after the first layout, so board measures are real
@@ -127,18 +172,21 @@
   const ICON_BOTTOM = -4;
 
   function buildTopology() {
+    const board = Engine.board();
     const sc = Engine.scenario();
     svg.innerHTML = '';
+    svg.setAttribute('aria-label', board.aria || sc.subtitle);
     nodeEls = {};
     linkEls = [];
+    subEls = {};
     const linkLayer = svgEl('g', { class: 'links' });
     const nodeLayer = svgEl('g', { class: 'nodes' });
     svg.append(linkLayer, nodeLayer);
 
     const byId = {};
-    for (const n of sc.nodes) byId[n.id] = n;
+    for (const n of board.nodes) byId[n.id] = n;
 
-    for (const l of sc.links) {
+    for (const l of board.links) {
       const a = byId[l.from], b = byId[l.to];
       // A link meets the glyphs, not a box: sideways along a row, straight down between rows.
       const sideways = Math.abs(a.y - b.y) < 1;
@@ -155,7 +203,7 @@
       linkLayer.appendChild(line);
     }
 
-    for (const n of sc.nodes) {
+    for (const n of board.nodes) {
       const g = svgEl('g', { class: 'node node-' + n.kind, transform: 'translate(' + n.x + ',' + n.y + ')' });
       g.dataset.id = n.id;
       const tip = svgEl('title', {});
@@ -166,7 +214,15 @@
       const label = svgEl('text', { class: 'node-label', y: 8, 'text-anchor': 'middle' });
       label.textContent = n.label;
       const sub = svgEl('text', { class: 'node-sub', y: 19, 'text-anchor': 'middle' });
+      // A line the story earns: `subFrom` names the step that hands this node the address, and
+      // `subBefore` is what the map says until then. Nodes without it print their `sub` throughout.
+      sub.dataset.full = n.sub;
+      if (n.subFrom) {
+        sub.dataset.before = n.subBefore || '';
+        sub.dataset.at = String(sc.steps.findIndex((s) => s.id === n.subFrom));
+      }
       sub.textContent = n.sub;
+      subEls[n.id] = sub;
       g.append(icon, label, sub);
       nodeEls[n.id] = g;
       nodeLayer.appendChild(g);
@@ -191,6 +247,10 @@
       g.classList.toggle('known', !onPath.has(id) && known.has(id));
       g.classList.toggle('unknown', !known.has(id));
     }
+    for (const id in subEls) {
+      const s = subEls[id];
+      s.textContent = s.dataset.at !== undefined && index < +s.dataset.at ? s.dataset.before : s.dataset.full;
+    }
     for (const line of linkEls) {
       const active = onPath.has(line.dataset.from) && onPath.has(line.dataset.to) &&
         (!step.hop || (step.hop.includes(line.dataset.from) && step.hop.includes(line.dataset.to)));
@@ -198,6 +258,54 @@
       const used = known.has(line.dataset.from) && known.has(line.dataset.to);
       line.classList.toggle('unknown', !used);
     }
+  }
+
+  // ---------- the table beside the map ----------
+
+  function tableEl(t) {
+    const table = el('table', 'fields step-table');
+    const head = el('thead');
+    const headRow = el('tr');
+    for (const c of t.columns) headRow.appendChild(el('th', null, c));
+    head.appendChild(headRow);
+    table.appendChild(head);
+    const body = el('tbody');
+    for (const row of t.rows) {
+      const tr = el('tr');
+      for (const cell of row) tr.appendChild(el('td', null, String(cell)));
+      body.appendChild(tr);
+    }
+    table.appendChild(body);
+    return table;
+  }
+
+  /**
+   * The figures a step is read on, drawn beside the map rather than in the drawer. A step without a
+   * table of its own keeps showing the last one from its chapter, so the calculation stays in view
+   * while the messages that follow it play; the line above then names the step it came from.
+   */
+  function renderBoardTable(index) {
+    const steps = Engine.steps();
+    const phase = steps[index].phase;
+    let found = null;
+    for (let i = index; i >= 0 && steps[i].phase === phase; i--) {
+      if (steps[i].table) { found = { at: i, table: steps[i].table }; break; }
+    }
+    const host = document.getElementById('board-table');
+    const wasOpen = !host.hidden;
+    host.innerHTML = '';
+    if (found) {
+      host.hidden = false;
+      if (found.at !== index) {
+        host.appendChild(el('p', 'board-table-from',
+          'calculated at step ' + (found.at + 1) + ' — ' + steps[found.at].title));
+      }
+      host.appendChild(el('h3', null, found.table.caption || 'The numbers'));
+      host.appendChild(tableEl(found.table));
+    } else {
+      host.hidden = true;
+    }
+    if (!!found !== wasOpen) relayout();   // the map just gained or lost a column
   }
 
   function renderRail(step) {
@@ -220,7 +328,7 @@
     say.innerHTML = '';
     say.appendChild(el('span', 'say-where', step.phase + ' · step ' + (index + 1) + ' of ' + total));
     say.appendChild(document.createTextNode(' ' + (step.say || step.title)));
-    const actor = Engine.scenario().nodes.find((n) => n.id === step.actor);
+    const actor = Engine.nodes().find((n) => n.id === step.actor);
     document.getElementById('subtitle').textContent =
       step.title + ' — ' + DIR_WORD[step.dir] + (actor ? ' · at the ' + actor.label : '');
   }
@@ -362,7 +470,7 @@
     const who = el('details', 'legend');
     who.appendChild(el('summary', null, 'Who is who on the map'));
     const list = el('ul', 'legend-list');
-    for (const n of Engine.scenario().nodes) {
+    for (const n of Engine.nodes()) {
       const li = el('li');
       li.appendChild(el('span', 'legend-name', n.label));
       li.appendChild(document.createTextNode(' — ' + (n.note || n.sub)));
@@ -392,7 +500,20 @@
     const playing = Engine.isPlaying();
     clearAdvance();
 
+    // A different walkthrough, or a chapter drawn on its own canvas: rebuild the map, the packet
+    // layer and the step list before painting this step.
+    if (Engine.scenarioId !== lastScenarioId || Engine.board() !== lastBoard) {
+      Anim.stop();
+      buildChrome();
+      lastScenarioId = Engine.scenarioId;
+      lastBoard = Engine.board();
+      lastStep = null;
+      lastSpeed = null;
+    }
+    markScenario();
+
     paintTopology(step, index);
+    renderBoardTable(index);
     renderRail(step);
     renderCaption(step, index, total);
     paintTicks(index);
@@ -420,9 +541,30 @@
     play.textContent = playing ? '❙❙ Pause' : '▶ Play';
     play.disabled = Engine.atEnd() && !playing;
     document.getElementById('btn-speed').textContent = Engine.speed + '×';
-    document.querySelectorAll('.pip').forEach((p, i) => {
+    document.querySelectorAll('#phases .pip').forEach((p, i) => {
       p.classList.toggle('active', Engine.phases()[i] === step.phase);
     });
+  }
+
+  // One tab per walkthrough defined in the data, so a second scenario is reachable in one click.
+  function buildScenarios() {
+    const host = document.getElementById('scenarios');
+    host.innerHTML = '';
+    for (const id in NETV.scenarios) {
+      const sc = NETV.scenarios[id];
+      const b = el('button', 'pip');
+      b.type = 'button';
+      b.dataset.id = id;
+      b.textContent = sc.nav || sc.title;
+      b.title = sc.subtitle || '';
+      b.addEventListener('click', () => { Engine.pause(); Engine.load(id); });
+      host.appendChild(b);
+    }
+  }
+
+  function markScenario() {
+    const host = document.getElementById('scenarios');
+    for (const b of host.children) b.classList.toggle('active', b.dataset.id === Engine.scenarioId);
   }
 
   function buildPips() {
@@ -444,9 +586,17 @@
     });
   }
 
+  /** Everything that depends on which scenario and which board are on screen. */
+  function buildChrome() {
+    document.getElementById('tagline').textContent = Engine.scenario().subtitle;
+    buildTopology();
+    Anim.attach(svg, document.getElementById('stack'));
+    buildTicks();
+    buildPips();
+    buildScenarios();
+  }
+
   function boot(scenarioId) {
-    const sc = NETV.scenario(scenarioId || 'http');
-    document.getElementById('tagline').textContent = sc.subtitle;
     svg = document.getElementById('topology');
     railHost = document.getElementById('rail');
     tickHost = document.getElementById('ticks');
@@ -469,12 +619,9 @@
     });
 
     Engine.start(scenarioId);
-    buildTopology();
     wireBoard();
-    Anim.attach(svg, document.getElementById('stack'));
-    buildTicks();
-    buildPips();
     Engine.onchange(onEmit);
+    buildChrome();
     onEmit(Engine.current(), Engine.index, Engine.steps().length);
 
     // Let the page explain itself on arrival, unless motion is unwelcome or a step was linked to.

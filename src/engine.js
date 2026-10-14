@@ -2,7 +2,7 @@
 // long each step's animation lasts.
 (function (global) {
   const NETV = global.NETV;
-  const SPEEDS = [1, 1.5, 2];
+  const SPEEDS = [0.5, 1, 1.5, 2];
 
   const Engine = {
     scenarioId: null,
@@ -45,6 +45,15 @@
 
     phases: function () {
       return this.scenario().phases;
+    },
+
+    /** The map the current step is drawn on: per-phase when the scenario declares boards. */
+    board: function () {
+      return NETV.boardOf(this.scenario(), this.current().phase);
+    },
+
+    nodes: function () {
+      return this.board().nodes;
     },
 
     go: function (i) {

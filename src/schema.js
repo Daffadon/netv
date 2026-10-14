@@ -5,24 +5,29 @@
 
   // Render order for the packet inspector: outermost header first.
   // ARP sits before ip on purpose - an ARP message travels in a frame with no IP header.
-  NETV.HEADER_ORDER = ['ethernet', 'arp', 'ip', 'tcp', 'udp', 'dns', 'dhcp', 'http'];
+  // OSPF sits between ip and tcp: it is carried by IP itself (protocol 89), with no transport
+  // header under it. BGP is innermost: it is an application that rides TCP.
+  NETV.HEADER_ORDER = ['ethernet', 'arp', 'ip', 'ospf', 'tcp', 'udp', 'dns', 'dhcp', 'http', 'bgp'];
 
   NETV.HEADER_LABELS = {
     ethernet: 'Ethernet frame',
     arp: 'ARP message',
     ip: 'IPv4 header',
+    ospf: 'OSPF packet',
     tcp: 'TCP header',
     udp: 'UDP header',
     dns: 'DNS message',
     dhcp: 'DHCP message',
-    http: 'HTTP message'
+    http: 'HTTP message',
+    bgp: 'BGP message'
   };
 
   // Which TCP/IP row a header belongs to, for the packet inspector. The page names layers the way
   // TCP/IP does, so nothing here prints a bare OSI number.
   NETV.HEADER_ROW = {
-    ethernet: 'Link', arp: 'Internet/Link', ip: 'Internet', tcp: 'Transport', udp: 'Transport',
-    dns: 'Application', dhcp: 'Application', http: 'Application'
+    ethernet: 'Link', arp: 'Internet/Link', ip: 'Internet', ospf: 'Internet',
+    tcp: 'Transport', udp: 'Transport',
+    dns: 'Application', dhcp: 'Application', http: 'Application', bgp: 'Application'
   };
 
   // The layer rail, top to bottom, in the four-layer TCP/IP model (RFC 1122 §1.1.3). OSI's
@@ -30,7 +35,7 @@
   // Link covers both the data-link and the physical row. Each entry lists the OSI numbers a step's
   // `osi` array may use to light that row up.
   NETV.LAYERS = [
-    { name: 'Application', osi: [7, 6, 5], help: 'HTTP, DNS and DHCP speak here' },
+    { name: 'Application', osi: [7, 6, 5], help: 'HTTP, DNS, DHCP and BGP speak here' },
     { name: 'Transport', osi: [4], help: 'TCP and UDP: which program, and in what order' },
     { name: 'Internet', osi: [3], help: 'IP addresses: which machine, across networks' },
     { name: 'Link', osi: [2, 1], help: 'hardware addresses, and the wire itself' }
@@ -39,7 +44,7 @@
   // Short label written on the travelling packet: the innermost header is what it really is.
   NETV.HEADER_CHIP = {
     ethernet: 'frame', arp: 'ARP', ip: 'packet', tcp: 'TCP',
-    udp: 'UDP', dns: 'DNS', dhcp: 'DHCP', http: 'HTTP'
+    udp: 'UDP', dns: 'DNS', dhcp: 'DHCP', http: 'HTTP', ospf: 'OSPF', bgp: 'BGP'
   };
 
   // How the step's bytes travel on the link. Derived from the addresses the step already declares,
@@ -69,6 +74,14 @@
     arp: ['hardwareType', 'protocolType', 'op', 'senderMac', 'senderIp', 'targetMac', 'targetIp'],
     ip: ['version', 'headerLength', 'dscp', 'ecn', 'totalLength', 'id', 'flags', 'fragmentOffset',
       'ttl', 'protocol', 'checksum', 'src', 'dst'],
+    // One catalogue for all five OSPF packet types and for the LSA they carry: a step lists the
+    // names the message it shows actually has.
+    ospf: ['version', 'type', 'packetLength', 'routerId', 'areaId', 'checksum', 'autype',
+      'networkMask', 'helloInterval', 'options', 'routerPriority', 'routerDeadInterval',
+      'designatedRouter', 'backupDesignatedRouter', 'neighbors',
+      'interfaceMtu', 'ddSequence', 'lsaHeaders',
+      'lsaType', 'linkStateId', 'advertisingRouter', 'lsAge', 'sequenceNumber', 'lsaChecksum',
+      'length', 'numberOfLsa', 'links', 'metric'],
     tcp: ['srcPort', 'dstPort', 'seq', 'ack', 'dataOffset', 'flags', 'window', 'checksum',
       'urgentPointer', 'options'],
     udp: ['srcPort', 'dstPort', 'length', 'checksum'],
@@ -76,7 +89,12 @@
       'additional'],
     dhcp: ['op', 'htype', 'hlen', 'xid', 'secs', 'flags', 'ciaddr', 'yiaddr', 'siaddr', 'giaddr',
       'chaddr', 'magicCookie', 'options'],
-    http: null // free-form: startLine plus whatever field lines the message carries
+    http: null, // free-form: startLine plus whatever field lines the message carries
+    // BGP messages: one catalogue for OPEN, UPDATE, KEEPALIVE and NOTIFICATION.
+    bgp: ['marker', 'length', 'type', 'version', 'myAs', 'holdTime', 'bgpIdentifier',
+      'optionalParameters', 'withdrawnRoutes', 'pathAttributes', 'nlri',
+      'origin', 'asPath', 'nextHop', 'localPreference', 'multiExitDisc', 'communities',
+      'errorCode', 'errorSubcode']
   };
 
   // What each field name means, in words a beginner can use. The drawer prints one hint per row,
@@ -158,6 +176,57 @@
       magicCookie: 'fixed value marking the rest as options',
       options: 'the settings: mask, gateway, names, lease time'
     },
+    ospf: {
+      version: 'which version of the routing protocol this is (2)',
+      type: 'which of the five protocol messages this is',
+      packetLength: 'how long this whole protocol message is',
+      routerId: 'the name a router gives itself: its own highest address',
+      areaId: 'which part of the network these routers share (0.0.0.0 = the whole network)',
+      checksum: 'cover for the whole message, to catch damage in transit',
+      autype: 'what kind of proof of identity this router offers',
+      networkMask: 'how wide the network this message is sent on is',
+      helloInterval: 'seconds until this router sends the next hello',
+      options: 'which extra abilities this router has',
+      routerPriority: 'who leads the group when the priorities differ',
+      routerDeadInterval: 'seconds of silence before a neighbour counts as gone',
+      designatedRouter: 'the router chosen to speak for this shared network',
+      backupDesignatedRouter: 'the router that takes that job over if the first one goes',
+      neighbors: 'the routers whose hellos this router has already heard',
+      interfaceMtu: 'the largest message this link can carry in one piece',
+      ddSequence: 'which page of the database summary this is, so the pages go back in order',
+      lsaHeaders: 'the table of contents of the sender\'s own map, one line per entry',
+      lsaType: 'which kind of map entry this is (1 = a router and the links it has)',
+      linkStateId: 'which piece of the map this entry describes',
+      advertisingRouter: 'the router that made this entry, so it can be told apart from copies',
+      lsAge: 'how many seconds old this entry is',
+      sequenceNumber: 'which version of the entry this is: the newer number wins',
+      lsaChecksum: 'cover for the entry, not counting its age',
+      length: 'how long this map entry is',
+      numberOfLsa: 'how many map entries this message carries',
+      links: 'the links this router is advertising, one entry per interface',
+      metric: 'what this link costs to use: lower is better'
+    },
+    bgp: {
+      marker: 'a fixed pattern, so both sides agree where a message begins',
+      length: 'how long this message is',
+      type: 'which of the four message kinds this is',
+      version: 'which version of the protocol this speaker uses (4)',
+      myAs: 'the number of the network sending this message',
+      holdTime: 'seconds of silence allowed before the connection is dropped',
+      bgpIdentifier: 'the address this router uses as its own name',
+      optionalParameters: 'extras the two sides can agree to use',
+      withdrawnRoutes: 'routes the sender no longer offers',
+      pathAttributes: 'the claims that come with the route: where it came from and what it costs',
+      nlri: 'the addresses this route makes reachable',
+      origin: 'how the sender first learned the route (igp, egp or incomplete)',
+      asPath: 'the networks the route has passed through, newest first',
+      nextHop: 'the address to send to when this route is used',
+      localPreference: 'how much this network prefers this way out: higher wins',
+      multiExitDisc: 'a hint to the neighbour about which entry point to use: lower wins',
+      communities: 'labels the sender attaches so a policy can match on them',
+      errorCode: 'why the sender is refusing the message or closing the connection',
+      errorSubcode: 'the finer reason inside that code'
+    },
     http: {
       startLine: 'the request line or status line, first line of the message',
       Host: 'which site on this server is wanted',
@@ -192,6 +261,15 @@
     if (!s) throw new Error('unknown scenario: ' + id);
     if (!s.steps) s.steps = [];
     return s;
+  };
+
+  /**
+   * The map a chapter is drawn on. A scenario with one map keeps its nodes and links on the
+   * scenario itself (the HTTP walkthrough); a scenario whose chapters need different maps
+   * declares `boards: { <phase>: { nodes, links, aria } }` and each chapter gets its own canvas.
+   */
+  NETV.boardOf = function (scenario, phase) {
+    return (scenario.boards && scenario.boards[phase]) || scenario;
   };
 
   NETV.addSteps = function (scenarioId, steps) {
