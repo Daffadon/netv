@@ -1,0 +1,23 @@
+# Development files that stay out of the repository. The published site is
+# unaffected by this file: wrangler reads .assetsignore, not this.
+
+# The optional smoke test (tools/smoke.mjs) needs jsdom, and the README says to
+# install it outside the tree so the page stays dependency-free. This only
+# catches an accidental in-tree install.
+node_modules/
+
+# Wrangler's own state: the local caches under cache/, tmp/, and miniflare's
+# SQLite databases (cache, d1, kv, r2, observability) under state/v3/.
+.wrangler/
+
+# Wrangler reads .dev.vars for local secrets. That file never ships and never
+# enters history; the deployed site carries no secrets at all.
+.dev.vars
+
+# Editor and OS droppings — this repository is edited from Windows through WSL.
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+.idea/
+.vscode/

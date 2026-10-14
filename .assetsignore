@@ -1,0 +1,10 @@
+# Files in the assets directory (the repository root) that must NOT be uploaded as public assets.
+# Same format as .gitignore. See https://developers.cloudflare.com/workers/static-assets/binding/
+docs/
+tools/
+README.md
+wrangler.jsonc
+.assetsignore
+node_modules/
+.wrangler/
+.git/

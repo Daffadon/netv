@@ -1,0 +1,204 @@
+NETV.addSteps('http', [
+  {
+    id: 'http-response-message',
+    phase: 'HTTP',
+    title: 'The server serialises the HTTP response',
+    say: 'The reply: a status line, a few labels, and the page itself.',
+    actor: 'server',
+    dir: 'out',
+    osi: [7],
+    pdu: 'HTTP message',
+    payload: 'the HTML representation, 1256 bytes',
+    fields: {
+      http: {
+        startLine: 'HTTP/1.1 200 OK',
+        'Content-Type': 'text/html; charset=utf-8',
+        'Content-Length': '1256',
+        Date: 'Tue, 13 Oct 2026 21:00:00 GMT',
+        ETag: '"a1b2c3"',
+        Connection: 'keep-alive'
+      }
+    },
+    explain: 'The response leaves in a fixed order: status line, field lines, an empty line, then the body. The status line holds the version, the three-digit status code and a reason phrase. Code 200 means the request was understood and handled. What the body holds depends on the method, and for GET it is a representation of the resource. Content-Length says the body is exactly 1256 octets; the connection stays open, so the close of the connection cannot mark the end. ETag marks this exact version so a later request can check it rather than download it again.',
+    analogy: 'Like a parcel with the address label on top, the contents list under it, and the goods packed last.',
+    cite: [
+      { rfc: 9112, sec: '4', title: 'Status Line' },
+      { rfc: 9110, sec: '15.3.1', title: '200 OK' },
+      { rfc: 9110, sec: '8.6', title: 'Content-Length' },
+      { rfc: 9112, sec: '6.2', title: 'Content-Length' },
+      { rfc: 9112, sec: '2.1', title: 'Message Format' }
+    ]
+  },
+  {
+    id: 'response-encapsulated',
+    phase: 'HTTP',
+    title: 'The response is encapsulated for the wire',
+    say: 'The same wrapping in reverse, with its own byte counter for this direction.',
+    actor: 'server',
+    dir: 'out',
+    osi: [7, 4, 3, 2, 1],
+    pdu: 'TCP segment',
+    payload: 'the HTTP response message',
+    fields: {
+      ethernet: { src: '00:1b:21:3c:4d:5e', type: '0x0800 (IPv4)', fcs: 'valid' },
+      ip: { version: 4, headerLength: 20, totalLength: 1296, id: '0x7b41', ttl: 64, protocol: '6 (TCP)', checksum: '0x9f2c', src: '203.0.113.80', dst: '198.51.100.23' },
+      tcp: { srcPort: 80, dstPort: 49152, seq: '0x5e6f7082 (server ISN + 1)', ack: '0x1a2b3cf1 (client ISN + 1 + 163 request bytes)', flags: 'PSH, ACK', window: 65535, dataOffset: 20, checksum: '0x3a7d' },
+      http: {
+        startLine: 'HTTP/1.1 200 OK',
+        'Content-Type': 'text/html; charset=utf-8',
+        'Content-Length': '1256',
+        Date: 'Tue, 13 Oct 2026 21:00:00 GMT',
+        ETag: '"a1b2c3"',
+        Connection: 'keep-alive'
+      }
+    },
+    explain: 'The HTTP message becomes the payload of a TCP segment. TCP numbers these outgoing bytes with its own sequence numbers, and in the same segment it acknowledges the bytes it has received from the client. The two directions have separate sequence spaces and windows, so the acknowledgement here covers only the client-to-server stream. PSH tells the receiving side to hand the data up as soon as it arrives rather than wait for more. The 1256-byte body fits in one segment; a larger body would be split into segments of at most 1460 bytes and put back together at the client from the sequence numbers.',
+    analogy: 'Like packing a gift in a box, where the box carries its own label even though the gift inside already has one.',
+    changes: [
+      'TCP adds a 20-byte header, so the IP payload is 1276 bytes',
+      'IP adds a 20-byte header; total length 1296',
+      'Frame leaves the server with source MAC 00:1b:21:3c:4d:5e'
+    ],
+    cite: [
+      { rfc: 9293, sec: '3.7', title: 'Segmentation' },
+      { rfc: 9293, sec: '3.7.1', title: 'Maximum Segment Size Option' },
+      { rfc: 9293, sec: '3.8', title: 'Data Communication' },
+      { rfc: 9112, sec: '6.3', title: 'Message Body Length' }
+    ]
+  },
+  {
+    id: 'response-crosses-internet',
+    phase: 'HTTP',
+    title: 'The response crosses the Internet and NAT restores the address',
+    say: 'Coming home, the router recognises the reply and hands it to the right device.',
+    actor: 'gw',
+    dir: 'in',
+    hop: ['server', 'edge', 'transit', 'isp', 'gw', 'ap', 'client'],
+    osi: [4, 3, 2, 1],
+    pdu: 'Ethernet frame',
+    fields: {
+      ethernet: { type: '0x0800 (IPv4)', fcs: 'valid' },
+      ip: { version: 4, headerLength: 20, totalLength: 1296, id: '0x7b41', ttl: 64, protocol: '6 (TCP)', checksum: '0x9f2c', src: '203.0.113.80', dst: '198.51.100.23' },
+      tcp: { srcPort: 80, dstPort: 49152, seq: '0x5e6f7082 (server ISN + 1)', ack: '0x1a2b3cf1 (client ISN + 1 + 163 request bytes)', flags: 'PSH, ACK', window: 65535 },
+      http: {
+        startLine: 'HTTP/1.1 200 OK',
+        'Content-Type': 'text/html; charset=utf-8',
+        'Content-Length': '1256',
+        Connection: 'keep-alive'
+      }
+    },
+    explain: 'The reply comes back along the same routers, and each one lowers the TTL by one: 64 from the server, then 63, 62, 61, 60 at the home router. The packet is addressed to 198.51.100.23, the router itself, on the port it recorded when the request left. The router finds that pair in its translation table and puts back the internal destination 192.168.1.87:49152 before sending it to the laptop. If the entry had expired, the router would drop the packet, since it could not tell which device the connection belonged to. The frame is rebuilt for the local network, and the access point switches it untouched.',
+    analogy: 'Like a hotel reception that checks the room number on a returning parcel before carrying it to the right guest.',
+    changes: [
+      'TTL 64 → 60 across the four routers on the return trip',
+      'Destination IP rewritten 198.51.100.23 → 192.168.1.87',
+      'Destination port restored to 49152',
+      'Frame rewritten for the LAN: src b8:27:eb:11:22:33, dst a4:5e:60:1f:2c:8b'
+    ],
+    note: 'The public source port the router assigned is not part of the scenario constants, so only the restored internal port 49152 is shown. A dropped packet here looks to the client like a lost segment and is retransmitted by TCP.',
+    cite: [
+      { rfc: 3022, sec: '3.2', title: 'Address lookup and translation' },
+      { rfc: 3022, sec: '3.3', title: 'Address unbinding' },
+      { rfc: 1812, sec: '5.3.1', title: 'Time to Live (TTL)' }
+    ]
+  },
+  {
+    id: 'client-receives',
+    phase: 'HTTP',
+    title: 'The client decapsulates and accepts the segment',
+    say: 'Your laptop rebuilds the stream in order and wakes up the browser.',
+    actor: 'client',
+    dir: 'in',
+    osi: [4, 3, 2, 1],
+    pdu: 'Ethernet frame',
+    fields: {
+      ethernet: { dst: 'a4:5e:60:1f:2c:8b', src: 'b8:27:eb:11:22:33', type: '0x0800 (IPv4)', fcs: 'valid' },
+      ip: { version: 4, headerLength: 20, totalLength: 1296, id: '0x7b41', ttl: 60, protocol: '6 (TCP)', checksum: '0x9f2c', src: '203.0.113.80', dst: '192.168.1.87' },
+      tcp: { srcPort: 80, dstPort: 49152, seq: '0x5e6f7082 (server ISN + 1)', ack: '0x1a2b3cf1 (client ISN + 1 + 163 request bytes)', flags: 'PSH, ACK', window: 65535 },
+      http: {
+        startLine: 'HTTP/1.1 200 OK',
+        'Content-Type': 'text/html; charset=utf-8',
+        'Content-Length': '1256',
+        Connection: 'keep-alive'
+      }
+    },
+    explain: 'The frame is opened up layer by layer. Ethernet checks the destination address on the frame and strips it. IP checks its destination address and strips its header. TCP then receives the segment, and the sequence number lands exactly where the client expected the next byte, so the segment is in order. TCP puts the 1256 body bytes into the socket receive buffer and acknowledges the bytes from the server. The browser call that was waiting for data now returns. The TTL that arrived is 60, what is left after the four routers each lowered it once.',
+    analogy: 'Like a post room that checks the parcel belongs here, files it in order on the shelf, then tells the office it has arrived.',
+    changes: [
+      'IP strips the 20-byte header and finds destination 192.168.1.87, the laptop',
+      'TCP accepts 1256 bytes in order and buffers them',
+      'An ACK for the server bytes is queued to send back'
+    ],
+    cite: [
+      { rfc: 9293, sec: '3.8', title: 'Data Communication' },
+      { rfc: 9293, sec: '3.1', title: 'Header Format' },
+      { rfc: 791, sec: '3.1', title: 'Internet Header Format' }
+    ]
+  },
+  {
+    id: 'browser-renders',
+    phase: 'HTTP',
+    title: 'The browser parses the response and starts rendering',
+    say: 'The browser reads the answer and starts drawing, then asks for the pictures too.',
+    actor: 'client',
+    dir: 'none',
+    osi: [7],
+    pdu: 'HTTP message',
+    payload: 'the HTML source, 1256 bytes',
+    fields: {
+      http: {
+        startLine: 'HTTP/1.1 200 OK',
+        'Content-Type': 'text/html; charset=utf-8'
+      }
+    },
+    explain: 'The client matches the response to the request it sent, then reads the status line and the field lines and hands the decoded body to the HTML parser, which starts building the page. The body points to style sheets, scripts and images, so more requests follow for those. The connection stays open by default and is reused for those later requests, which is what Connection: keep-alive asked for, and it saves a fresh TCP handshake for each resource.',
+    analogy: 'A phone call you keep open to order more items instead of hanging up and dialling again each time.',
+    note: 'HTTP/1.1 has no request identifier in a response, so the client matches each response to a request by the order the requests were sent on that connection; a response cannot be matched by content.',
+    cite: [
+      { rfc: 9112, sec: '9.3', title: 'Persistence' },
+      { rfc: 9112, sec: '9.2', title: 'Associating a Response to a Request' },
+      { rfc: 9293, sec: '3.8', title: 'Data Communication' }
+    ]
+  },
+  {
+    id: 'tcp-teardown',
+    phase: 'HTTP',
+    title: 'The client begins closing the connection',
+    say: 'Done talking. Each side says it has finished, one direction at a time.',
+    actor: 'client',
+    dir: 'out',
+    hop: ['client', 'ap', 'gw'],
+    osi: [4],
+    pdu: 'TCP segment',
+    payload: 'no application data',
+    fields: {
+      tcp: { srcPort: 49152, dstPort: 80, seq: '0x1a2b3cf1 (next byte after the request)', ack: '0x5e6f756a (server ISN + 1 + 1256 response bytes)', flags: 'FIN, ACK' }
+    },
+    explain: 'Closing takes four segments rather than two, because each direction closes on its own. The client sends FIN to say it has no more data to send, and it stops accepting new data from the browser on this connection. Even so the connection is only half closed: the client can still receive and read until the server sends its own FIN. The ACK travels in the same segment, because the client is still acknowledging bytes it already received from the server.',
+    analogy: 'Like ending a written exchange where each person posts a final note and waits for the other reply before clearing the desk.',
+    cite: [
+      { rfc: 9293, sec: '3.6', title: 'Closing a Connection' },
+      { rfc: 9293, sec: '3.3', title: 'TCP Terminology Overview' }
+    ]
+  },
+  {
+    id: 'time-wait',
+    phase: 'HTTP',
+    title: 'TIME-WAIT holds the connection open',
+    say: 'The laptop waits a short while before forgetting, in case a stray packet returns.',
+    actor: 'client',
+    dir: 'none',
+    osi: [4],
+    pdu: 'TCP segment',
+    fields: {
+      tcp: { srcPort: 49152, dstPort: 80, flags: 'ACK' }
+    },
+    explain: 'The side that sent the first FIN keeps the connection record for twice the maximum segment lifetime before deleting it, and the standard requires this. The final ACK can be lost, and a repeated FIN from the server must be answered instead of met with a reset, so the endpoint stays around long enough to acknowledge it again. A duplicate segment still travelling from this connection must also expire before the same address and port can be used again, or that stale copy would land in the wrong connection.',
+    analogy: 'Like a librarian keeping a returned book on the cart a while before reshelving it, in case someone asks for it again.',
+    note: 'On a busy server this is the state that piles up in netstat, and it is why the ephemeral port range can be exhausted.',
+    cite: [
+      { rfc: 9293, sec: '3.6.1', title: 'Half-Closed Connections' },
+      { rfc: 9293, sec: '3.3', title: 'TCP Terminology Overview' }
+    ]
+  }
+]);

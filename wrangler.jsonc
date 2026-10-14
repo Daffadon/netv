@@ -1,0 +1,15 @@
+// Cloudflare Workers static assets. No Worker script: every request is answered by a file here.
+// Deploy with: npx wrangler deploy
+// Docs: https://developers.cloudflare.com/workers/static-assets/
+{
+  "name": "netv",
+  // Set to the date of your first deploy. Changing it later can change runtime behaviour.
+  "compatibility_date": "2026-10-13",
+  "assets": {
+    // The site is the repository root, so the assets directory is "."
+    // (.assetsignore keeps docs/, tools/ and the repo files off the public site).
+    "directory": ".",
+    // Documented default: "/" serves index.html, "/file.html" redirects to "/file".
+    "html_handling": "auto-trailing-slash"
+  }
+}

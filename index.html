@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>netv — watch one web page travel the Internet</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <span class="brand">netv</span>
+  <span class="tagline" id="tagline"></span>
+  <nav class="phases" id="phases" aria-label="Chapters"></nav>
+</header>
+
+<main class="app" id="app">
+
+  <div class="board" id="board">
+    <div class="board-bar">
+      <div class="transport">
+        <button id="btn-prev" type="button" aria-label="Previous step">◀</button>
+        <button id="btn-play" type="button" class="primary">▶ Play</button>
+        <button id="btn-next" type="button" aria-label="Next step">▶</button>
+        <button id="btn-speed" type="button" title="Playback speed">1×</button>
+      </div>
+      <aside class="layer-rail" id="rail" aria-label="Layer stack"></aside>
+      <div class="board-tools">
+        <button id="btn-zoom-out" type="button" aria-label="Zoom out">−</button>
+        <span class="zoom-level" id="zoom-level">100%</span>
+        <button id="btn-zoom-in" type="button" aria-label="Zoom in">+</button>
+        <button id="btn-zoom-fit" type="button" title="Show the whole map">Fit</button>
+      </div>
+    </div>
+
+    <div class="board-scroll" id="board-scroll">
+      <svg id="topology" viewBox="0 0 860 320" role="img"
+           aria-label="The path from your device through the home router, the ISP and the backbone to the server, plus the DNS server hierarchy."></svg>
+    </div>
+
+    <div class="packet-stack" id="stack" aria-hidden="true"></div>
+    <p class="board-say" id="say" aria-live="polite"></p>
+    <div class="ticks" id="ticks" role="group" aria-label="Jump to a step"></div>
+  </div>
+
+  <details class="card drawer" id="drawer">
+    <summary>Step details</summary>
+    <div class="drawer-body">
+      <div class="step-head">
+        <p class="eyebrow">
+          <span id="phase"></span><span class="dot">·</span><span id="counter"></span>
+        </p>
+        <p class="sub" id="subtitle"></p>
+      </div>
+      <div class="detail" id="detail"></div>
+    </div>
+  </details>
+
+</main>
+
+<!-- Plain scripts, no modules: the page must open from a double-clicked file:// URL. -->
+<script src="src/schema.js"></script>
+<script src="data/scenario-http.js"></script>
+<script src="data/http/1-boot.js"></script>
+<script src="data/http/2-resolve.js"></script>
+<script src="data/http/3-connect.js"></script>
+<script src="data/http/4-request.js"></script>
+<script src="data/http/5-response.js"></script>
+<script src="src/engine.js"></script>
+<script src="src/anim.js"></script>
+<script src="src/ui.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    NETV.UI.boot();
+  });
+</script>
+</body>
+</html>
