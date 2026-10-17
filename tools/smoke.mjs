@@ -149,6 +149,8 @@ const base = 'http://127.0.0.1:' + server.address().port + '/index.html';
 
   c.assert(NETV.scenarios.http.steps.length === 30, 'master step list has 30 steps');
   c.assert(h.ticks().length === 30, 'one tick per step', h.ticks().length);
+  c.assert(NETV.Engine.speed === 0.5 && h.text('#btn-speed') === '0.5×',
+    'the walkthrough opens at the slowest speed, so a step can be followed', h.text('#btn-speed'));
   c.assert(h.text('#counter') === 'Step 1 of 30', 'opens on step 1', h.text('#counter'));
   c.assert(/browser/i.test(h.text('#say')), 'the opening caption is plain language', h.text('#say'));
   c.assert(h.layers().join(',') === 'Application', 'step 1 lights only the Application row', h.layers());

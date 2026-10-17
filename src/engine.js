@@ -8,7 +8,7 @@
     scenarioId: null,
     index: 0,
     playing: false,
-    speed: 1,
+    speed: 0.5,
     _listeners: [],
 
     load: function (scenarioId, stepId) {

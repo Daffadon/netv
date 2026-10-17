@@ -69,8 +69,9 @@ for this layout.
 The canvas is the page. It plays itself — press **▶ Play** (or just leave it) and watch one line at
 a time as the packet crosses the network.
 
-Controls: **Play/Pause**, **◀ ▶** for one step at a time, a **speed** button (0.5× / 1× / 1.5× / 2×), the
-three chapter tabs in the top bar (**DHCP** steps 1–6, **DNS** 7–9, **HTTP** 10–30), the 30-segment
+Controls: **Play/Pause**, **◀ ▶** for one step at a time, a **speed** button (0.5× / 1× / 1.5× / 2×,
+opening at the slowest), the three chapter tabs in the top bar (**DHCP** steps 1–6, **DNS** 7–9,
+**HTTP** 10–30), the theme switcher beside them (**Auto** / **Light** / **Dark**), the 30-segment
 progress bar along the bottom edge, or the keyboard — `←` `→`, `space`, `Home`, `End`.
 
 * **The two walkthroughs** — the top bar switches between **HTTP** (30 steps in three chapters) and
