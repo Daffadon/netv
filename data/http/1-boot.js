@@ -10,7 +10,7 @@ NETV.addSteps('http', [
     dir: 'none',
     osi: [7],
     pdu: 'nothing on the wire yet',
-    explain: 'The browser takes http://daffapn.my.id/ apart into two facts it needs next. The scheme says requests go to port 80 over an unencrypted connection. The authority is a name, not an address, and that name has to become an address before anything can leave the laptop. The laptop has only now joined the network and holds no address of its own, so even the DNS query has to wait.',
+    explain: 'The browser splits http://daffapn.my.id/ into parts it needs next. The scheme http means use the unencrypted web protocol and, because no port is written, port 80 is used. daffapn.my.id is a host name, not an Internet Protocol (IP) address; the Domain Name System (DNS) looks it up before the laptop can connect. The laptop has joined the network but does not have its own IP address yet, so it first needs an address and settings from DHCP (Dynamic Host Configuration Protocol).',
     analogy: 'You hold a friend\'s name but not their street address, and your own new house has no door number yet.',
     changes: ['Nothing is transmitted: the browser has only recorded the scheme, the host name and the default port 80'],
     cite: [
@@ -35,9 +35,9 @@ NETV.addSteps('http', [
       udp: { srcPort: 68, dstPort: 67 },
       dhcp: { op: '1 (BOOTREQUEST)', xid: '0x9f3a17c2', chaddr: 'a4:5e:60:1f:2c:8b', ciaddr: '0.0.0.0' }
     },
-    explain: 'The laptop has no address of its own, so it fills in the source as 0.0.0.0 and the destination as 255.255.255.255, the broadcast address every machine on the local link reads, since it does not know which one runs the DHCP server. At layer 2 the destination address is FF:FF:FF:FF:FF:FF, so the switch sends the frame out of every other port. The request rides UDP from port 68 to port 67, not TCP: it has to finish before the interface is configured, and TCP cannot set up its handshake or retransmissions without an address.',
+    explain: 'The laptop has no address of its own, so it uses source 0.0.0.0 and destination 255.255.255.255, the broadcast address every machine on the local link reads. At layer 2 the destination is FF:FF:FF:FF:FF:FF, so the switch sends the frame out of every other port. The request uses UDP (User Datagram Protocol) from port 68 to port 67, not TCP (Transmission Control Protocol). UDP sends this single message without opening a connection; TCP needs an address to start its handshake, so DHCP must happen first.',
     analogy: 'You call out a question to the whole room because you do not know who has the answer.',
-    changes: ['TTL stays 64: a limited broadcast is never forwarded by a router, so it never crosses a routing hop', 'The frame is flooded to the whole LAN, and only the DHCP server answers'],
+    changes: ['TTL stays 64: a limited broadcast is never forwarded by a router, so it never crosses a routing hop', 'The frame is flooded to every device on the local network, and only the DHCP server answers'],
     note: 'The broadcast reaches every host on the link, but only the machine configured as the DHCP server replies.',
     cite: [
       { rfc: 2131, sec: '3.1', title: 'Client-server interaction - allocating a network address' },
@@ -69,9 +69,9 @@ NETV.addSteps('http', [
         options: 'subnet mask 255.255.255.0, router 192.168.1.1, DNS 198.51.100.53, lease time 86400 s'
       }
     },
-    explain: 'The router answers with an offer: the client address field holds 192.168.1.87, the address it is willing to lend. It still broadcasts the reply to 255.255.255.255, because the client has not taken that address yet and cannot be reached directly. The options carry what is needed to use the address: mask 255.255.255.0 sets the size of the local network, router 192.168.1.1 becomes the way off it, DNS 198.51.100.53 is the resolver to ask about names, and lease 86400 seconds says how long the address is lent.',
+    explain: 'The router offers the laptop an IP address it is willing to lend: 192.168.1.87. The reply stays broadcast because the laptop has not claimed that address yet, so the router cannot send directly to it. The options give needed settings: mask 255.255.255.0 marks which addresses are on the same local network; router 192.168.1.1 is the gateway for destinations outside it; DNS 198.51.100.53 is the server that looks up names; lease 86400 seconds (24 hours) says how long the address is lent.',
     analogy: 'A hotel clerk lends you a room and also says which wing it is in, which door leads out and when to check out.',
-    changes: ['yiaddr now carries the offered address 192.168.1.87', 'Reply is still broadcast, so it can reach the client before the client owns an address'],
+    changes: ['The DHCP reply now carries the offered address 192.168.1.87', 'Reply is still broadcast, so it can reach the client before the client owns the address'],
     cite: [
       { rfc: 2131, sec: '3.1', title: 'Client-server interaction - allocating a network address' },
       { rfc: 2131, sec: '4.3.1', title: 'DHCPDISCOVER message' }
@@ -99,7 +99,7 @@ NETV.addSteps('http', [
         options: 'requested IP 192.168.1.87, server identifier 192.168.1.1'
       }
     },
-    explain: 'The client picks one offer, so it broadcasts a request that names the server it chose, which lets any other server release the address it was holding. That server answers with an acknowledgement that commits the lease. Only when the acknowledgement arrives does the laptop take the configuration: address 192.168.1.87 with a mask of /24, gateway 192.168.1.1 and resolver 198.51.100.53, kept for 24 hours.',
+    explain: 'The client chooses one offer and broadcasts a request naming its chosen server, so other servers release the addresses they held. The chosen server sends an acknowledgement (ACK) that commits the lease. Only then does the laptop use 192.168.1.87/24: /24 is another way to write mask 255.255.255.0. The gateway and DNS resolver are saved with the address for 24 hours.',
     analogy: 'You accept one shop\'s quote out loud so the other shops stop holding the item for you, then the shop confirms the sale.',
     changes: ['Source stays 0.0.0.0 for the REQUEST; the client adopts 192.168.1.87 only after the ACK', 'The interface is now usable: 192.168.1.87/24, gateway 192.168.1.1, DNS 198.51.100.53'],
     note: 'This whole phase runs once per network join, not once per page load — the lease lasts 24 hours and is renewed in the background much later.',

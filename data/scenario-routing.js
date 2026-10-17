@@ -65,7 +65,7 @@
     id: 'routing',
     nav: 'Routing',
     title: 'OSPF and BGP',
-    subtitle: 'Inside one network and between two: how the routers already knew where to send the HTTP packet.',
+    subtitle: 'OSPF builds a map inside one network; BGP shares reachable address blocks between networks, and policy chooses the route.',
     phases: ['OSPF', 'BGP'],
 
     boards: {
@@ -83,6 +83,6 @@
     },
 
     // Short blast of context shown above the step list.
-    preamble: 'This continues the HTTP walkthrough: the same request to daffapn.my.id, watched from the routers\' side instead of the packet\'s. Two networks carry it — the provider that moves it, and the datacentre that holds the server — and neither was born knowing the other exists. The first chapter is how one network agrees on a map of itself, and the second is how two networks tell each other what they can reach.'
+    preamble: 'This continues the HTTP walkthrough: the same request, now seen from the routers’ side. A router moves a packet one hop at a time, using a route to choose the next router (the next hop). OSPF lets routers inside one network exchange link reports and calculate paths across their shared map. BGP lets different networks advertise address blocks (groups of IP addresses) they can reach; each network uses its own policy to choose a route. As you step through, follow the highlighted message, the route table it changes, then the packet’s next hop. This is an entry point, not a complete guide to Internet routing.'
   });
 })(globalThis);

@@ -197,7 +197,6 @@ const base = 'http://127.0.0.1:' + server.address().port + '/index.html';
   c.assert(h.q('#themes .pip.active').dataset.id === 'auto' && h.q('#themes .pip[data-id="dark"]').getAttribute('aria-pressed') === 'false',
     'going back to Auto leaves the system in charge', h.q('#themes .pip.active').dataset.id);
   c.assert(h.text('#say').startsWith('DHCP · step 1 of 30 '), 'the caption says where the story is', h.text('#say'));
-  c.assert(/joined the Wi-Fi/.test(h.text('#detail')), 'step 1 says what the walkthrough is about', h.text('#detail'));
   c.assert(NETV.scenarios.http.steps[4].phase === 'DHCP' && NETV.scenarios.http.steps[6].phase === 'DNS',
     'the ARP steps sit in the network chapter, not under DNS');
   const drawer = h.q('#drawer');

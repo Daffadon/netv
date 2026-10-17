@@ -91,7 +91,7 @@ TTL, recomputes the L3 checksum and builds a *new* L2 frame for the next hop.
 
 The routing walkthrough reuses those nodes and adds the roles its two maps need: **access router**
 (the provider's router facing the home) · **core router** · **designated router / backup designated
-router** (the two that speak for a shared segment) · **border router** (the edge of one network,
+router** (elected pair that coordinates map exchange on a shared segment; the backup takes over if the first fails) · **border router** (the edge of one network,
 where the interior protocol stops and the one between networks begins) · **autonomous system** (the
 whole network under one operator, named by an AS number) · **internal peer** and **external peer**
 (two routers of the same network, or of two different ones — the datacentre reaches the provider
@@ -118,32 +118,34 @@ Header fields exactly as RFC 9293 §3.1 defines them, flags CWR ECE URG ACK PSH 
 
 The routing walkthrough's vocabulary, in the two halves its chapters follow.
 
-**Inside one network** (the interior protocol): every router keeps a *link state database*, built by
-flooding rather than by exchanging routes — **link state advertisement** (LSA: how a router describes
-its own links, with an `LS age`, an `LS sequence number` and an `LS checksum` so an old copy can never
-overwrite a newer one) · **Hello** (the repeated greeting that discovers and keeps neighbours —
-`HelloInterval`, `RouterDeadInterval`) · neighbour state **2-Way** (each has heard the other) ·
-**ExStart / Exchange / Loading / Full** (the states the two pass through while they compare and
-complete their databases) · **Database Description** (the table of contents, page by page) ·
-**Link State Request / Update / Acknowledgment** (how the missing entries move, and how the exchange
-is made reliable without TCP) · **Designated Router** and **Backup Designated Router** (one speaker
-per shared segment, so N routers need 2N adjacencies instead of N²) · **flooding** (an entry reaches
-every router in the area) · **area** (the part of the network whose routers share one database; the
-backbone is `0.0.0.0`) · **router ID** (a router's own name, its highest address) · **interface
-output cost** (what one link costs to use, set by the operator) · **shortest path first** (the
-calculation each router runs on the same database) · **convergence** (every router back in step after
-a change).
+**Inside one network** (the interior protocol): every router keeps a *link-state database*, a map of
+the network built from link descriptions rather than exchanged routes. A **link-state advertisement
+(LSA)** describes one router’s links. Its sequence number marks the version, its age lets stale entries
+expire, and its checksum detects damage.
+**Hello** messages are greetings routers send to discover and keep neighbours (`HelloInterval` is how often; `RouterDeadInterval` is when silence means gone); **2-Way** means each router has heard the other. **ExStart / Exchange / Loading /
+Full** are neighbour states while they compare and complete databases. **Database Description** is a
+page-by-page index; **Link State Request / Update / Acknowledgment** ask for missing entries, deliver
+them and confirm receipt without TCP. On a shared segment, elected **Designated Router** and **Backup
+Designated Router** coordinate map exchange and reduce pairwise adjacencies. **Flooding** delivers an
+entry to every router in an **area**, the part of a network whose routers share one database; the
+backbone is `0.0.0.0`. **Router ID** is a stable name for a router; this scenario chooses its highest
+loopback address. **Interface output cost** is an operator-set link cost. **Shortest path first** uses
+those costs to choose low-cost paths, not physically shortest ones. **Convergence** means routers are
+back in step after a change.
 
-**Between networks** (the exterior protocol): **autonomous system** (one operator's network, named by
-an AS number) · **prefix** (the block being offered, `203.0.113.0/24`) · **path vector** (a route is
-a prefix plus the list of networks it passed through) · **external / internal peer** (`eBGP` / `iBGP`)
-· **OPEN**, **UPDATE**, **KEEPALIVE**, **NOTIFICATION** (the four messages; the session itself runs
-over TCP port 179) · **NLRI** (the addresses an update makes reachable) · **path attributes**:
-`ORIGIN`, `AS_PATH` (the sender prepends its own AS), `NEXT_HOP`, `LOCAL_PREF`, `MULTI_EXIT_DISC` ·
-**decision process** (highest `LOCAL_PREF`, shortest `AS_PATH`, lowest `ORIGIN`, lowest `MED`, external
-before internal peer, lowest interior cost to `NEXT_HOP`, lowest router identity) · **route withdrawal**
-· **policy** (nothing forces a router to accept an offer). The two halves meet at `NEXT_HOP`: an
-exterior route is usable only while the interior protocol can still reach that address.
+**BGP advertisement:** a route announcement in an `UPDATE`, not a website page or user packet. It tells a BGP peer which
+destination address block can be reached and includes details about the route. The receiving network decides whether
+to accept, reject or prefer it; an advertisement is an offer, not an instruction.
+
+**Between networks** (the exterior protocol): **autonomous system** (one operator’s network, named by an AS number) ·
+**prefix** (a block of destination IP addresses; `203.0.113.0/24` contains server `203.0.113.80`) ·
+**path vector** (a route is a destination prefix plus the list of AS numbers it passed through) ·
+**external / internal peer** (`eBGP` / `iBGP`: BGP neighbour in a different / same network) ·
+**OPEN**, **UPDATE**, **KEEPALIVE**, **NOTIFICATION** (message types; session runs over TCP port 179) ·
+**NLRI** (Network Layer Reachability Information: address block an `UPDATE` announces as reachable) · **path attributes**:
+`ORIGIN` (how BGP records where a route entered) · `AS_PATH` (AS numbers on the route, newest first) · `NEXT_HOP` (IP address of the next router) · `LOCAL_PREF` (this network’s preference; higher wins, kept inside this network) · `MULTI_EXIT_DISC / MED` (neighbor’s optional link hint; lower wins when comparing routes from the same network) ·
+**decision process** (highest `LOCAL_PREF`, shortest `AS_PATH`, lowest `ORIGIN`, lowest `MED`, external before internal peer, lowest interior cost to `NEXT_HOP`, lowest router identity) ·
+**route withdrawal** (sender says it no longer offers a route) · **policy** (receiver’s rules for accepting and choosing offers). The two halves meet at `NEXT_HOP`: an exterior route is usable only while the interior protocol can still reach that address.
 
 ## 8. Citation registry (verified against rfc-editor.org)
 

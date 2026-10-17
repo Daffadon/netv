@@ -19,7 +19,7 @@ NETV.addSteps('http', [
         Connection: 'keep-alive'
       }
     },
-    explain: 'The response leaves in a fixed order: status line, field lines, an empty line, then the body. The status line holds the version, the three-digit status code and a reason phrase. Code 200 means the request was understood and handled. What the body holds depends on the method, and for GET it is a representation of the resource. Content-Length says the body is exactly 1256 octets; the connection stays open, so the close of the connection cannot mark the end. ETag marks this exact version so a later request can check it rather than download it again.',
+    explain: 'A response starts with a status line, then headers, a blank line, and the body (the page data). HTTP/1.1 200 OK means the request succeeded. For this GET, the body is the HTML page. Content-Type tells the browser how to read it; Content-Length says it has 1256 bytes, so the browser knows where the body ends even though the TCP connection stays open. ETag is a version label the browser can later use to check whether the page changed.',
     analogy: 'Like a parcel with the address label on top, the contents list under it, and the goods packed last.',
     cite: [
       { rfc: 9112, sec: '4', title: 'Status Line' },
@@ -231,7 +231,7 @@ NETV.addSteps('http', [
     fields: {
       tcp: { srcPort: 49152, dstPort: 80, seq: '0x1a2b3cf1 (next byte after the request)', ack: '0x5e6f756a (server ISN + 1 + 1256 response bytes)', flags: 'FIN, ACK' }
     },
-    explain: 'Closing takes four segments rather than two, because each direction closes on its own. The client sends FIN to say it has no more data to send, and it stops accepting new data from the browser on this connection. Even so the connection is only half closed: the client can still receive and read until the server sends its own FIN. The ACK travels in the same segment, because the client is still acknowledging bytes it already received from the server.',
+    explain: 'The two directions of a TCP connection close separately. The client sends FIN (“I have finished sending”) and can still receive data. The connection is half-closed, not gone, until the server sends its own FIN. The ACK in the same segment confirms bytes the client already received from the server.',
     analogy: 'Like ending a written exchange where each person posts a final note and waits for the other reply before clearing the desk.',
     cite: [
       { rfc: 9293, sec: '3.6', title: 'Closing a Connection' },
@@ -241,7 +241,7 @@ NETV.addSteps('http', [
   {
     id: 'time-wait',
     phase: 'HTTP',
-    title: 'TIME-WAIT holds the connection open',
+    title: 'TIME-WAIT: TCP waits for old packets to expire',
     say: 'The laptop waits a short while before forgetting, in case a stray packet returns.',
     actor: 'client',
     dir: 'none',
@@ -250,7 +250,7 @@ NETV.addSteps('http', [
     fields: {
       tcp: { srcPort: 49152, dstPort: 80, flags: 'ACK' }
     },
-    explain: 'The side that sent the first FIN keeps the connection record for twice the maximum segment lifetime before deleting it, and the standard requires this. The final ACK can be lost, and a repeated FIN from the server must be answered instead of met with a reset, so the endpoint stays around long enough to acknowledge it again. A duplicate segment still travelling from this connection must also expire before the same address and port can be used again, or that stale copy would land in the wrong connection.',
+    explain: 'TIME-WAIT is a short waiting state after the client closes first. TCP keeps the connection record for twice the maximum segment lifetime (the longest a segment may remain in the network). If the final ACK was lost, the client can acknowledge a repeated FIN from the server. Waiting also lets old duplicate segments expire before the same address and port are used by a new connection.',
     analogy: 'Like a librarian keeping a returned book on the cart a while before reshelving it, in case someone asks for it again.',
     note: 'On a busy server this is the state that piles up in netstat, and it is why the ephemeral port range can be exhausted.',
     cite: [

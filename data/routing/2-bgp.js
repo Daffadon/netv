@@ -118,8 +118,8 @@ NETV.addSteps('routing', [
   {
     id: 'bgp-update-advertise',
     phase: 'BGP',
-    title: 'The datacentre offers its block with the path attached',
-    say: 'Each side offers the addresses it can reach, with the proof attached.',
+    title: 'The datacentre advertises a block of addresses it can reach',
+    say: 'An advertisement is a route announcement, not the website: “send packets for this block to me.”',
     actor: 'edge',
     hop: ['edge', 'transit'],
     dir: 'out',
@@ -138,9 +138,9 @@ NETV.addSteps('routing', [
         nlri: '203.0.113.0/24'
       }
     },
-    explain: 'An update carries the addresses being offered and the claims that come with them: where the sender first learned the route, which networks it has passed through, and which address to send to next. This network puts its own number at the front of that list, so every receiver can see the path the offer travelled. A route is not a distance; it is a claim with evidence attached, and the receiver is free to judge it.',
-    analogy: 'A merchant advertises goods with a receipt showing where they came from.',
-    changes: ['AS_PATH starts as 64520, the sender\u2019s own network number, prepended to an empty list'],
+    explain: 'The edge router sends this UPDATE over its existing BGP session to the provider’s border router. It is a route announcement, not the web page or HTTP request: “My network can deliver packets for 203.0.113.0/24; send them first to 203.0.113.1.” A prefix is a block of destination IP addresses; this one includes the server at 203.0.113.80. The fields describe the offer: AS_PATH 64520 shows this route came from network 64520, NEXT_HOP 203.0.113.1 names the router to hand packets to, and MED 0 is the datacentre’s hint for which of its links the provider should use. A hint is not a command: the provider can accept, reject, or prefer another offer under its own policy. The next steps show the second offer and the provider’s choice.',
+    analogy: 'A delivery company posts which address districts it serves and which depot to send packages to; the notice is not the package.',
+    changes: ['NLRI 203.0.113.0/24 is the announced destination block; it includes the server at 203.0.113.80', 'AS_PATH starts as 64520, the announcing network’s number, prepended to an empty list'],
     note: 'The network numbers 64512 to 65534 are set aside for private use, so they never name a real network on the public internet.',
     cite: [
       { rfc: 4271, sec: '4.3', title: 'UPDATE Message Format' },

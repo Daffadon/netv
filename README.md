@@ -82,6 +82,7 @@ progress bar along the bottom edge, or the keyboard — `←` `→`, `space`, `H
   tables use, so the two offers the datacentre makes and the policy that weighs them can be followed
   on the canvas — the home router sits outside both. The step URL carries which walkthrough it
   belongs to (`#/routing/bgp-open`), so a chapter can be linked to directly.
+  Routing's first-step details give a short orientation to next hops, what OSPF and BGP contribute, and how to follow the highlighted message, route table, and packet. It is an entry point, not a full routing guide.
 * **The colour theme** — the top bar's second segmented control. **Auto** follows the system
   setting, **Light** and **Dark** pin the white console palette or the charcoal one, and the choice
   is kept in `localStorage` so it survives a reload; `color-scheme` follows the palette, so
