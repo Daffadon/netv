@@ -178,6 +178,9 @@ for (const scenarioId of Object.keys(SCENARIOS)) {
       if (!here.has(l.from) || !here.has(l.to)) {
         err(tag + phase + ' link ' + l.from + ' - ' + l.to + ' joins a node that map does not draw');
       }
+      if (l.cost !== undefined && !(Number.isInteger(l.cost) && l.cost > 0)) {
+        err(tag + phase + ' link ' + l.from + ' - ' + l.to + ' has cost "' + l.cost + '", and an interface cost is a whole number above zero');
+      }
     }
   }
   if (scenario.boards) {

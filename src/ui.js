@@ -199,6 +199,25 @@
       });
       line.dataset.from = l.from;
       line.dataset.to = l.to;
+      // A link that declares a cost prints it at its own midpoint, pushed just off the line so the
+      // number never sits under the stroke: the tables' figures become links you can point at.
+      if (l.cost !== undefined) {
+        const x = (+line.getAttribute('x1') + +line.getAttribute('x2')) / 2;
+        const y = (+line.getAttribute('y1') + +line.getAttribute('y2')) / 2;
+        const dx = +line.getAttribute('x2') - +line.getAttribute('x1');
+        const dy = +line.getAttribute('y2') - +line.getAttribute('y1');
+        const len = Math.hypot(dx, dy) || 1;
+        const cost = svgEl('text', {
+          class: 'link-cost',
+          x: (x + dy / len * 7).toFixed(1),
+          y: (y - dx / len * 7).toFixed(1),
+          dy: '0.35em',
+          'text-anchor': 'middle'
+        });
+        cost.textContent = String(l.cost);
+        line.costLabel = cost;
+        linkLayer.appendChild(cost);
+      }
       linkEls.push(line);
       linkLayer.appendChild(line);
     }
@@ -257,6 +276,10 @@
       line.classList.toggle('traversed', active);
       const used = known.has(line.dataset.from) && known.has(line.dataset.to);
       line.classList.toggle('unknown', !used);
+      if (line.costLabel) {
+        line.costLabel.classList.toggle('unknown', !used);
+        line.costLabel.classList.toggle('traversed', active);   // the cost of the path being walked
+      }
     }
   }
 

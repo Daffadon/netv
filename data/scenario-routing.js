@@ -17,13 +17,15 @@
     { id: 'transit', label: 'border router', sub: '198.51.100.2', x: 640, y: 76, kind: 'router', note: 'the edge of the provider network: the router that speaks to other networks' }
   ];
 
+  // `cost` is the interface output cost the operator set, printed on the link itself so the
+  // figures in the tables can be pointed at on the map (docs/data-schema.md §2).
   const OSPF_LINKS = [
-    { from: 'gw', to: 'isp' },
-    { from: 'isp', to: 'core-a' },
-    { from: 'isp', to: 'core-b' },
-    { from: 'core-a', to: 'core-b' },
-    { from: 'core-a', to: 'transit' },
-    { from: 'core-b', to: 'transit' }
+    { from: 'gw', to: 'isp', cost: 1 },
+    { from: 'isp', to: 'core-a', cost: 1 },
+    { from: 'isp', to: 'core-b', cost: 10 },
+    { from: 'core-a', to: 'core-b', cost: 10 },
+    { from: 'core-a', to: 'transit', cost: 1 },
+    { from: 'core-b', to: 'transit', cost: 10 }
   ];
 
   // The two networks and the links between them: the same path the HTTP packet crossed, with the

@@ -355,6 +355,9 @@ const base = 'http://127.0.0.1:' + server.address().port + '/index.html';
     'the OSPF chapter draws the provider network', [...h.doc.querySelectorAll('.node')].map((n) => n.dataset.id));
   c.assert(h.doc.querySelectorAll('.link').length === 6, 'and the links between its routers',
     h.doc.querySelectorAll('.link').length);
+  c.assert([...h.doc.querySelectorAll('.link-cost')].map((t) => t.textContent).join(',') === '1,1,10,10,1,10',
+    'each link prints the interface cost the tables use',
+    [...h.doc.querySelectorAll('.link-cost')].map((t) => t.textContent).join(','));
   c.assert(h.liveRails().join(' > ') === 'ethernet > ip > ospf',
     'a Hello wraps eth > ip > ospf, with no transport header', h.liveRails());
   c.assert(h.layers().join(',') === 'Internet,Link', 'OSPF lights the two rows it uses', h.layers());
@@ -376,6 +379,13 @@ const base = 'http://127.0.0.1:' + server.address().port + '/index.html';
   c.assert(h.doc.querySelector('#board-table').hidden === true,
     'a step before the calculation has no table beside the map',
     h.doc.querySelector('#board-table').hidden);
+
+  // the packet's own path, at the costs the tables hold: 1 + 1 + 1 out to the border router
+  NETV.Engine.goToId('ospf-path');
+  NETV.Anim.settle(NETV.Engine.current());
+  c.assert([...h.doc.querySelectorAll('.link-cost.traversed')].map((t) => t.textContent).join('+') === '1+1+1',
+    'the link costs on the path are the ones the table named',
+    [...h.doc.querySelectorAll('.link-cost.traversed')].map((t) => t.textContent).join('+'));
 
   // the other chapter is drawn on a different canvas
   click([...h.doc.querySelectorAll('#phases .pip')][1]);

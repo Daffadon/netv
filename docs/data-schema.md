@@ -120,6 +120,14 @@ and `subBefore` (what the map prints until that step). The laptop's address is t
 and `subFrom` must be a step of the same scenario — the validator rejects either half alone and a
 step id that does not exist.
 
+A link may declare `cost`, the OSPF interface output cost of §2, and the map prints it at the
+link's midpoint — the only place a figure in the tables can be pointed at on the canvas. Only the
+OSPF board has them; BGP links carry no interior metric. The validator rejects a cost that is not
+a whole number above zero. Whenever a step of a chapter is showing a `table` (§4), that chapter's
+whole board is drawn undimmed instead of growing with the story, and the links the step's `hop`
+walks print their cost in the accent colour: a figure the reader cannot find on the map is a figure
+they cannot check.
+
 `client` · `ap` (L2 switch/AP — rewrites nothing above L2, **never touches TTL**) · `gw` (home
 router: NAT + gateway) · `isp` · `transit` (backbone) · `edge` (datacenter edge) · `server` ·
 `resolver` · `root` (root nameserver) · `tld` (.id) · `auth` (authoritative for daffapn.my.id)

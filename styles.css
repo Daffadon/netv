@@ -323,6 +323,18 @@ a { color: var(--link); }
 .link-dashed { stroke-dasharray: 4 4; }
 .link.traversed { stroke: var(--accent); stroke-width: 3.5; }
 .link.unknown { opacity: .18; }
+/* the interface cost the link was given, haloed in the canvas colour so the stroke under it
+   cannot run through the number */
+.link-cost {
+  font: 9px var(--mono);
+  fill: var(--muted);
+  paint-order: stroke;
+  stroke: var(--surface);
+  stroke-width: 3px;
+}
+.link-cost.unknown { opacity: .18; }
+/* the cost of the link the packet is walking: readable as the path it is adding up */
+.link-cost.traversed { fill: var(--accent); font-weight: 600; }
 
 .node { transition: opacity .35s ease; }
 .node-icon {
