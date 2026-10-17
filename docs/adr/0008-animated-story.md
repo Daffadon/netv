@@ -30,7 +30,9 @@ The default surface is a narrated animation that plays itself:
   the inside out and unwraps on arrival, one outline per layer; the TTL ticks down and a badge
   floats off every router it crosses; the destination peels the wrappers off in reverse.
 * **The map grows with the story.** Nodes and links the journey has not reached yet are dimmed to
-  18% opacity, so the full Internet topology is introduced rather than presented.
+  18% opacity, so the full Internet topology is introduced rather than presented. The exception is
+  any step showing a `table` (ADR 0017): its chapter's whole map is drawn undimmed, because every
+  figure in the table has to be findable on the canvas.
 * **Chapters instead of a step list.** Six chapter pips plus a 26-segment progress bar with tooltips
   replaces the 26 chips.
 * **It plays on arrival** (except on a deep link, and except under `prefers-reduced-motion`), with

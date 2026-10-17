@@ -380,6 +380,13 @@ const base = 'http://127.0.0.1:' + server.address().port + '/index.html';
     'a step before the calculation has no table beside the map',
     h.doc.querySelector('#board-table').hidden);
 
+  // the tables are read off the map: while one is on the canvas, nothing is dimmed
+  NETV.Engine.goToId('ospf-tables');
+  NETV.Anim.settle(NETV.Engine.current());
+  c.assert(h.doc.querySelectorAll('.node.unknown, .link.unknown, .link-cost.unknown').length === 0,
+    'the step showing the routing tables draws every router, link and cost they name',
+    h.doc.querySelectorAll('.node.unknown, .link.unknown, .link-cost.unknown').length);
+
   // the packet's own path, at the costs the tables hold: 1 + 1 + 1 out to the border router
   NETV.Engine.goToId('ospf-path');
   NETV.Anim.settle(NETV.Engine.current());

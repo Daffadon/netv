@@ -94,8 +94,10 @@ progress bar along the bottom edge, or the keyboard — `←` `→`, `space`, `H
   says how it travels: **unicast** traces the one link it crosses, while **broadcast** and
   **multicast** ring at every station that reads them. When the packet is routed, the TTL ticks down
   and a badge floats off every router it crosses. Parts of the map the story has not reached yet
-  stay dimmed, so the topology is introduced rather than dumped, and a line the story has to earn —
-  the laptop's address — is not printed until the step that hands it over.
+  stay dimmed, so the topology is introduced rather than dumped — except while a table of figures is
+  beside the canvas, which draws the whole map of its chapter with every OSPF link printing the
+  interface cost its figures were computed from. A line the story has to earn — the laptop's
+  address — is not printed until the step that hands it over.
 * **The bar over the canvas** — the transport buttons, the layer rail, and the zoom controls. The
   rail shows the four TCP/IP rows (Application, Transport, Internet, Link) and lights the ones this
   step uses; OSI's Presentation and Session rows are gone, because nothing in the scenario uses them.

@@ -259,7 +259,11 @@
   function paintTopology(step, index) {
     const onPath = new Set(step.hop || []);
     onPath.add(step.actor);
-    const known = knownAt[index] || new Set();
+    // While a chapter is showing a table of figures, its whole map is on the canvas: a figure the
+    // reader cannot find on the map is a figure they cannot check.
+    const known = boardTableFor(index) !== null
+      ? new Set(Object.keys(nodeEls))
+      : (knownAt[index] || new Set());
     for (const id in nodeEls) {
       const g = nodeEls[id];
       g.classList.toggle('current', onPath.has(id));
@@ -303,17 +307,27 @@
   }
 
   /**
+   * The table this step is read on: its own, or the last one from its chapter. Also doubles as the
+   * reveal rule's second half — while a chapter has figures on the canvas, its whole map is drawn,
+   * so every link and cost a figure came from can be pointed at.
+   */
+  function boardTableFor(index) {
+    const steps = Engine.steps();
+    const phase = steps[index].phase;
+    for (let i = index; i >= 0 && steps[i].phase === phase; i--) {
+      if (steps[i].table) return { at: i, table: steps[i].table };
+    }
+    return null;
+  }
+
+  /**
    * The figures a step is read on, drawn beside the map rather than in the drawer. A step without a
    * table of its own keeps showing the last one from its chapter, so the calculation stays in view
    * while the messages that follow it play; the line above then names the step it came from.
    */
   function renderBoardTable(index) {
+    const found = boardTableFor(index);
     const steps = Engine.steps();
-    const phase = steps[index].phase;
-    let found = null;
-    for (let i = index; i >= 0 && steps[i].phase === phase; i--) {
-      if (steps[i].table) { found = { at: i, table: steps[i].table }; break; }
-    }
     const host = document.getElementById('board-table');
     const wasOpen = !host.hidden;
     host.innerHTML = '';
