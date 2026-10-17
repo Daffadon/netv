@@ -170,6 +170,9 @@
   const ICON_SIDE = 21;    // half their width, where a sideways link stops
   const ICON_TOP = -34;
   const ICON_BOTTOM = -4;
+  const REGION_PAD_X = 52;       // air around the widest label or address a node prints
+  const REGION_PAD_TOP = 66;     // the section's own label sits in this band, above the glyphs
+  const REGION_PAD_BOTTOM = 40;
 
   function buildTopology() {
     const board = Engine.board();
@@ -179,12 +182,34 @@
     nodeEls = {};
     linkEls = [];
     subEls = {};
+    const regionLayer = svgEl('g', { class: 'regions' });
     const linkLayer = svgEl('g', { class: 'links' });
     const nodeLayer = svgEl('g', { class: 'nodes' });
-    svg.append(linkLayer, nodeLayer);
+    svg.append(regionLayer, linkLayer, nodeLayer);
 
     const byId = {};
     for (const n of board.nodes) byId[n.id] = n;
+
+    // A board that holds more than one network draws a boundary around each: the nodes `regions`
+    // groups sit inside one section, labelled with the AS number that network is known by. The
+    // rectangle is derived from the nodes it holds, so the section follows its routers.
+    for (const r of board.regions || []) {
+      const members = (r.nodes || []).map((id) => byId[id]).filter(Boolean);
+      if (!members.length) continue;
+      const xs = members.map((n) => n.x), ys = members.map((n) => n.y);
+      const left = Math.min(...xs) - REGION_PAD_X, top = Math.min(...ys) - REGION_PAD_TOP;
+      regionLayer.appendChild(svgEl('rect', {
+        class: 'region',
+        x: left,
+        y: top,
+        width: Math.max(...xs) - Math.min(...xs) + 2 * REGION_PAD_X,
+        height: Math.max(...ys) - Math.min(...ys) + REGION_PAD_TOP + REGION_PAD_BOTTOM,
+        rx: 14
+      }));
+      const label = svgEl('text', { class: 'region-label', x: left + 14, y: top + 25 });
+      label.textContent = 'AS ' + r.as;
+      regionLayer.appendChild(label);
+    }
 
     for (const l of board.links) {
       const a = byId[l.from], b = byId[l.to];

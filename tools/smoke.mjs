@@ -358,6 +358,9 @@ const base = 'http://127.0.0.1:' + server.address().port + '/index.html';
   c.assert([...h.doc.querySelectorAll('.link-cost')].map((t) => t.textContent).join(',') === '1,1,10,10,1,10',
     'each link prints the interface cost the tables use',
     [...h.doc.querySelectorAll('.link-cost')].map((t) => t.textContent).join(','));
+  c.assert(h.doc.querySelectorAll('#topology .region, #topology .region-label').length === 0,
+    'the network sections stay on the map that holds two networks',
+    h.doc.querySelectorAll('#topology .region').length);
   c.assert(h.liveRails().join(' > ') === 'ethernet > ip > ospf',
     'a Hello wraps eth > ip > ospf, with no transport header', h.liveRails());
   c.assert(h.layers().join(',') === 'Internet,Link', 'OSPF lights the two rows it uses', h.layers());
@@ -413,6 +416,33 @@ const base = 'http://127.0.0.1:' + server.address().port + '/index.html';
     'every cell of that table is filled', h.doc.querySelectorAll('#board-table td').length);
   c.assert(h.doc.querySelectorAll('#detail .step-table').length === 0,
     'the drawer leaves the figures to the canvas', h.doc.querySelectorAll('#detail .step-table').length);
+
+  // The two networks are drawn as two sections on the canvas, not only tabulated beside it: each
+  // section is labelled with a network the table names, and each holds exactly the routers the
+  // table puts in it — the home router, which is in neither, outside both.
+  const tableNets = [];
+  for (const tr of h.doc.querySelectorAll('#board-table tbody tr')) {
+    const net = tr.cells[1].textContent;
+    if (/^AS [0-9]/.test(net) && !tableNets.includes(net)) tableNets.push(net);
+  }
+  const labels = [...h.doc.querySelectorAll('#topology .region-label')].map((t) => t.textContent);
+  c.assert(tableNets.length === 2 && labels.join(' | ') === tableNets.join(' | '),
+    'the map draws one section per network the table names', labels.join(' | ') + ' vs ' + tableNets.join(' | '));
+  const rects = [...h.doc.querySelectorAll('#topology .region')].map((r) => ({
+    x: +r.getAttribute('x'), y: +r.getAttribute('y'),
+    w: +r.getAttribute('width'), h: +r.getAttribute('height')
+  }));
+  const holds = (r, n) => n.x >= r.x && n.x <= r.x + r.w && n.y >= r.y && n.y <= r.y + r.h;
+  const misplaced = [];
+  for (const tr of h.doc.querySelectorAll('#board-table tbody tr')) {
+    const node = NETV.Engine.nodes().find((n) => n.label === tr.cells[0].textContent);
+    const want = tableNets.indexOf(tr.cells[1].textContent);
+    const got = rects.findIndex((r) => node && holds(r, node));
+    if (want !== got) misplaced.push(tr.cells[0].textContent + ' in ' + got + ' want ' + want);
+  }
+  c.assert(rects.length === 2 && misplaced.length === 0,
+    'every router sits inside the section of the network the table gives it, the home router in none',
+    misplaced.join(' | ') + ' rects=' + rects.length);
 
   NETV.Engine.goToId('bgp-tcp-peer');
   NETV.Anim.settle(NETV.Engine.current());

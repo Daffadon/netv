@@ -347,6 +347,9 @@ a { color: var(--link); }
 }
 .node-label { font: 600 11px var(--sans); fill: var(--fg); }
 .node-sub { font: 9px var(--mono); fill: var(--muted); }
+/* a network on the map: a dashed boundary around the nodes that share an AS number */
+.region { fill: none; stroke: var(--border); stroke-width: 1.5; stroke-dasharray: 7 5; }
+.region-label { font: 600 10px var(--mono); fill: var(--muted); letter-spacing: .06em; }
 .node.unknown { opacity: .18; }
 .node.known { opacity: .55; }
 .node.current { opacity: 1; }

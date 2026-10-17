@@ -32,11 +32,20 @@
   // provider's core router in it, plus the border router of the provider, the datacentre's two
   // front routers — one per link — and the server. Two links between the networks are what give the
   // last chapter its case: the same block offered twice, and a policy that picks between the offers.
+  // `regions` is what the map draws a boundary around: the routers of one network, labelled with
+  // the AS number the scenario's own tables use. The home router is in neither, so it sits outside
+  // both sections. The rectangle itself is derived from the nodes it holds (src/ui.js), so moving a
+  // router moves its section with it.
+  const BGP_REGIONS = [
+    { as: '64512', nodes: ['isp', 'core-a', 'transit'] },
+    { as: '64520', nodes: ['edge', 'edge-b', 'server'] }
+  ];
+
   const BGP_NODES = [
     { id: 'gw', label: 'home router', sub: '198.51.100.23', x: 110, y: 215, kind: 'router', note: 'the home router from the HTTP walkthrough: the packet starts its journey here' },
     { id: 'isp', label: 'ISP access', sub: '198.51.100.1', x: 250, y: 215, kind: 'router', note: 'the provider\'s access router: the first router the packet reaches' },
     { id: 'core-a', label: 'core A', sub: '192.0.2.5', x: 400, y: 215, kind: 'router', note: 'a core router of the provider, and an internal peer of the border router' },
-    { id: 'transit', label: 'border router', sub: 'AS 64512', x: 400, y: 70, kind: 'router', note: 'the edge of the provider network: it peers with the next network and decides what to accept' },
+    { id: 'transit', label: 'border router', sub: '198.51.100.2', x: 400, y: 70, kind: 'router', note: 'the edge of the provider network: it peers with the next network and decides what to accept' },
     { id: 'edge', label: 'edge router', sub: '203.0.113.1', x: 630, y: 70, kind: 'router', note: 'the datacentre\'s front router on the first link between the two networks' },
     { id: 'edge-b', label: 'edge router B', sub: '203.0.113.2', x: 790, y: 215, kind: 'router', note: 'the datacentre\'s front router on the second link between the two networks' },
     { id: 'server', label: 'server', sub: 'daffapn.my.id', x: 790, y: 70, kind: 'server', note: 'the machine that hosts the site, and the address the packet is trying to reach' }
@@ -68,7 +77,8 @@
       BGP: {
         aria: 'Two networks joined by two links: the provider\'s access and core routers, its border router peering with the datacentre\'s two edge routers, and the server at the end.',
         nodes: BGP_NODES,
-        links: BGP_LINKS
+        links: BGP_LINKS,
+        regions: BGP_REGIONS
       }
     },
 

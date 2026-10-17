@@ -39,7 +39,11 @@ to decide and its policy had nothing to change.
    fixed order over the two offers and stops at the hint, and `bgp-local-pref` shows the operator
    overriding the other network's hint with a preference of its own — first test, route moved,
    packet moved with it. `bgp-withdraw` now withdraws the offer the policy had chosen, so the spare
-   taking over is the case the step describes.
+   taking over is the case the step describes. The map says which network a router is in rather than
+   leaving it to the table: `boards.BGP.regions` groups the nodes by AS number, `src/ui.js` draws a
+   dashed boundary around each group and labels it `AS 64512` / `AS 64520`, and the home router —
+   in neither network — stays outside both sections, with the two links between the networks
+   crossing the gap between them.
 4. **The TTL warning compares like with like.** `tools/validate.js` used to warn whenever a step's
    TTL differed from the previous step's without a router forwarding it; a protocol message (TTL 1)
    following a forwarded frame (TTL 64) is not the same packet, so the check now applies only when

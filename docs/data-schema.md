@@ -120,6 +120,15 @@ and `subBefore` (what the map prints until that step). The laptop's address is t
 and `subFrom` must be a step of the same scenario — the validator rejects either half alone and a
 step id that does not exist.
 
+A board that holds more than one network may declare `regions`: one object per network, `{ as, nodes }`,
+where `as` is the number that network is known by in the scenario's own tables (`64512` for the
+provider, `64520` for the datacentre) and `nodes` lists the ids that belong to it. The map draws a
+dashed boundary around those nodes and labels it `AS` and the number, so the two networks are two
+sections on the canvas and a node of neither — the home router — sits outside both. The rectangle is
+derived from the nodes it groups, never stored, so moving a router moves its section with it. The
+validator rejects a section that is not a bare number, groups no node, or groups a node of another
+map.
+
 A link may declare `cost`, the OSPF interface output cost of §2, and the map prints it at the
 link's midpoint — the only place a figure in the tables can be pointed at on the canvas. Only the
 OSPF board has them; BGP links carry no interior metric. The validator rejects a cost that is not

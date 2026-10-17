@@ -182,6 +182,17 @@ for (const scenarioId of Object.keys(SCENARIOS)) {
         err(tag + phase + ' link ' + l.from + ' - ' + l.to + ' has cost "' + l.cost + '", and an interface cost is a whole number above zero');
       }
     }
+    // A section is drawn around the nodes it groups, so it can only hold nodes of this map.
+    for (const r of board.regions || []) {
+      if (!/^[0-9]+$/.test(r.as)) err(tag + phase + ' section "' + r.as + '" is not an AS number');
+      if (!r.nodes || !r.nodes.length) {
+        err(tag + phase + ' section AS ' + r.as + ' groups no node, so there is nothing to draw a boundary around');
+        continue;
+      }
+      for (const id of r.nodes) {
+        if (!here.has(id)) err(tag + phase + ' section AS ' + r.as + ' groups ' + id + ', which is not a node of this chapter\'s map');
+      }
+    }
   }
   if (scenario.boards) {
     for (const phase of Object.keys(scenario.boards)) {

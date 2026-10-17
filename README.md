@@ -77,8 +77,10 @@ progress bar along the bottom edge, or the keyboard — `←` `→`, `space`, `H
   **Routing** (25 steps in two). Routing is drawn on two canvases: OSPF works inside one provider
   network — four routers, two of them on one shared segment — and BGP on the two networks and the
   two links between them, which is what lets a route policy change move the traffic from one link
-  to the other. The step URL carries which walkthrough it belongs to
-  (`#/routing/bgp-open`), so a chapter can be linked to directly.
+  to the other. The two networks are drawn as two sections, each labelled with the AS number the
+  tables use, so the two offers the datacentre makes and the policy that weighs them can be followed
+  on the canvas — the home router sits outside both. The step URL carries which walkthrough it
+  belongs to (`#/routing/bgp-open`), so a chapter can be linked to directly.
 * **The canvas** — the map on a dotted field, filling everything under the top bar. Drag it to pan:
   the map floats in a canvas a little larger than the view, so a drag has somewhere to move it even
   at 100%, where the map already fits the width. **− / +**, `ctrl`/`⌘` + wheel, or **Fit** to zoom;
