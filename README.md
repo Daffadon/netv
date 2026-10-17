@@ -81,6 +81,10 @@ progress bar along the bottom edge, or the keyboard — `←` `→`, `space`, `H
   tables use, so the two offers the datacentre makes and the policy that weighs them can be followed
   on the canvas — the home router sits outside both. The step URL carries which walkthrough it
   belongs to (`#/routing/bgp-open`), so a chapter can be linked to directly.
+* **The colour theme** — the top bar's second segmented control. **Auto** follows the system
+  setting, **Light** and **Dark** pin the white console palette or the charcoal one, and the choice
+  is kept in `localStorage` so it survives a reload; `color-scheme` follows the palette, so
+  scrollbars and native widgets take the same side.
 * **The canvas** — the map on a dotted field, filling everything under the top bar. Drag it to pan:
   the map floats in a canvas a little larger than the view, so a drag has somewhere to move it even
   at 100%, where the map already fits the width. **− / +**, `ctrl`/`⌘` + wheel, or **Fit** to zoom;

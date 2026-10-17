@@ -54,10 +54,18 @@ tracking, 13px mono for anything an operator reads exactly; and a focus ring of 
   on each packet cell; ten hues do the work orange must not compete with.
 * **Dark mode follows the reference's elevation rule** — canvas `#15171A`, panel `#262A2E`,
   recessed `#1E2226`, hairline `#2E3338`, border `#3A3F44`, text `#E4E6E7`, muted `#9BA1A6`, and
-  the orange holds unchanged. It is driven by `prefers-color-scheme`, as before.
+  the orange holds unchanged. The palette is picked by `data-theme` on `<html>`, not by a media
+  query: **Auto** resolves `prefers-color-scheme` (and keeps listening, so a machine that changes
+  under the page is followed), **Light** and **Dark** pin one of the two, and the choice is kept in
+  `localStorage`. `color-scheme` is set with the palette, so scrollbars and native widgets match.
 
 ## Consequences
 
+* The theme switcher is three `.pip` buttons at the right end of the top bar, the same recessed
+  segmented control as the walkthroughs. `styles.css` shares those rules between `#scenarios` and
+  `#themes` and moved the second palette from a `@media` block to `:root[data-theme="dark"]`;
+  `src/ui.js` gained `wireTheme()` and `applyTheme()`. `tools/smoke.mjs` asserts the three choices,
+  which palette each puts on `<html>`, and that the choice is stored.
 * The change is confined to `styles.css` (tokens, then chrome) plus one element order in
   `index.html`. No hex value lives in `src/*.js`, so the map, the packet and the animation followed
   the tokens without an edit; `tools/validate.js` and `tools/smoke.mjs` pass unchanged (113

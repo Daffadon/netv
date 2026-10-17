@@ -1,5 +1,6 @@
 :root {
   /* Cloudflare console palette: white canvas, hairline rules, orange rationed to the action. */
+  color-scheme: light;
   --bg: #ffffff;
   --surface: #ffffff;
   --surface-2: #f7f7f7;
@@ -34,34 +35,36 @@
   --c-bgp: #be123c;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #15171a;
-    --surface: #262a2e;
-    --surface-2: #1e2226;
-    --hairline: #2e3338;
-    --border: #3a3f44;
-    --fg: #e4e6e7;
-    --muted: #9ba1a6;
-    --accent-text: #faad3f;
-    --accent-soft: rgba(246, 130, 31, .14);
-    --ring: rgba(246, 130, 31, .25);
-    --link: #7aa7ff;
-    --warn: #e8c56a;
-    --warn-soft: rgba(246, 197, 73, .14);
-    --veil: rgba(38, 42, 46, .92);
-    --shadow: 0 1px 3px rgba(0, 0, 0, .4);
-    --c-eth: #a78bfa;
-    --c-arp: #5eead4;
-    --c-ip: #7fa9ff;
-    --c-tcp: #f0a868;
-    --c-udp: #d8b45a;
-    --c-dns: #67d3e8;
-    --c-dhcp: #c99cf5;
-    --c-http: #74d99f;
-    --c-ospf: #a5b4fc;
-    --c-bgp: #fb7185;
-  }
+/* The second palette. Which one is in force is `data-theme` on <html>, written by src/ui.js before
+   the first frame — "auto" there resolves to whichever the system reports. `color-scheme` follows so
+   scrollbars and native widgets take the same side. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #15171a;
+  --surface: #262a2e;
+  --surface-2: #1e2226;
+  --hairline: #2e3338;
+  --border: #3a3f44;
+  --fg: #e4e6e7;
+  --muted: #9ba1a6;
+  --accent-text: #faad3f;
+  --accent-soft: rgba(246, 130, 31, .14);
+  --ring: rgba(246, 130, 31, .25);
+  --link: #7aa7ff;
+  --warn: #e8c56a;
+  --warn-soft: rgba(246, 197, 73, .14);
+  --veil: rgba(38, 42, 46, .92);
+  --shadow: 0 1px 3px rgba(0, 0, 0, .4);
+  --c-eth: #a78bfa;
+  --c-arp: #5eead4;
+  --c-ip: #7fa9ff;
+  --c-tcp: #f0a868;
+  --c-udp: #d8b45a;
+  --c-dns: #67d3e8;
+  --c-dhcp: #c99cf5;
+  --c-http: #74d99f;
+  --c-ospf: #a5b4fc;
+  --c-bgp: #fb7185;
 }
 
 * { box-sizing: border-box; }
@@ -117,10 +120,11 @@ a { color: var(--link); }
 .tagline { align-self: center; flex: 1; color: var(--muted); font-size: 13px; min-width: 200px; }
 .phases { display: flex; gap: 6px; flex-wrap: wrap; align-items: stretch; }
 
-/* the walkthrough switcher: a recessed segmented control, as the console groups its own lists */
-#scenarios { align-self: center; gap: 3px; padding: 3px; border-radius: 8px; background: var(--surface-2); }
-#scenarios .pip { background: transparent; border-color: transparent; }
-#scenarios .pip.active {
+/* the walkthrough and theme switchers: recessed segmented controls, as the console groups its own
+   lists */
+#scenarios, #themes { align-self: center; gap: 3px; padding: 3px; border-radius: 8px; background: var(--surface-2); }
+#scenarios .pip, #themes .pip { background: transparent; border-color: transparent; }
+#scenarios .pip.active, #themes .pip.active {
   background: var(--surface);
   box-shadow: inset 0 0 0 1px var(--border), var(--shadow);
   color: var(--fg);
@@ -143,8 +147,8 @@ a { color: var(--link); }
 }
 .pip:hover { color: var(--fg); }
 .pip.active { color: var(--fg); border-bottom-color: var(--accent); }
-#scenarios .pip { padding: 5px 12px; border-radius: 6px; border-bottom: 0; }
-#scenarios .pip.active { color: var(--fg); }
+#scenarios .pip, #themes .pip { padding: 5px 12px; border-radius: 6px; border-bottom: 0; }
+#scenarios .pip.active, #themes .pip.active { color: var(--fg); }
 
 /* ---------- layout: the canvas is everything under the top bar ---------- */
 .app { position: relative; flex: 1 1 auto; min-height: 0; display: flex; }

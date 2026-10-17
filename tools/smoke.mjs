@@ -178,6 +178,22 @@ const base = 'http://127.0.0.1:' + server.address().port + '/index.html';
     'each chapter says which steps it holds', [...h.doc.querySelectorAll('#phases .pip')].map((p) => p.title));
   c.assert([...h.doc.querySelectorAll('#scenarios .pip')].map((b) => b.textContent).join(',') === 'HTTP,Routing',
     'the top bar offers both walkthroughs', [...h.doc.querySelectorAll('#scenarios .pip')].map((b) => b.textContent));
+  c.assert([...h.doc.querySelectorAll('#themes .pip')].map((b) => b.textContent).join(',') === 'Auto,Light,Dark',
+    'the top bar offers the three themes', [...h.doc.querySelectorAll('#themes .pip')].map((b) => b.textContent));
+  c.assert(h.doc.documentElement.dataset.theme === 'light' && h.q('#themes .pip.active').dataset.id === 'auto',
+    'until a theme is picked, the system setting decides and auto is the one shown as in force',
+    h.doc.documentElement.dataset.theme + '/' + (h.q('#themes .pip.active') || {}).dataset.id);
+  h.click('#themes .pip[data-id="dark"]');
+  c.assert(h.doc.documentElement.dataset.theme === 'dark' && h.q('#themes .pip.active').dataset.id === 'dark',
+    'picking Dark switches the palette', h.doc.documentElement.dataset.theme);
+  c.assert(h.window.localStorage.getItem('netv.theme') === 'dark', 'and the choice is remembered',
+    h.window.localStorage.getItem('netv.theme'));
+  h.click('#themes .pip[data-id="light"]');
+  c.assert(h.doc.documentElement.dataset.theme === 'light' && h.q('#themes .pip.active').dataset.id === 'light',
+    'picking Light switches back', h.doc.documentElement.dataset.theme);
+  h.click('#themes .pip[data-id="auto"]');
+  c.assert(h.q('#themes .pip.active').dataset.id === 'auto' && h.q('#themes .pip[data-id="dark"]').getAttribute('aria-pressed') === 'false',
+    'going back to Auto leaves the system in charge', h.q('#themes .pip.active').dataset.id);
   c.assert(h.text('#say').startsWith('DHCP · step 1 of 30 '), 'the caption says where the story is', h.text('#say'));
   c.assert(/joined the Wi-Fi/.test(h.text('#detail')), 'step 1 says what the walkthrough is about', h.text('#detail'));
   c.assert(NETV.scenarios.http.steps[4].phase === 'DHCP' && NETV.scenarios.http.steps[6].phase === 'DNS',

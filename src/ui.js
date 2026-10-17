@@ -542,6 +542,58 @@
     host.appendChild(who);
   }
 
+  // ---------- the colour theme: an explicit choice, or whatever the system reports ----------
+
+  const THEMES = [
+    { id: 'auto', label: 'Auto', title: 'Auto: follow the system setting' },
+    { id: 'light', label: 'Light', title: 'Light: the white console palette' },
+    { id: 'dark', label: 'Dark', title: 'Dark: the charcoal palette' }
+  ];
+  const THEME_KEY = 'netv.theme';
+  const darkQuery = global.matchMedia ? global.matchMedia('(prefers-color-scheme: dark)') : null;
+
+  /** The stored choice, else auto. file:// may refuse storage, the same guard engine.js keeps. */
+  function themeChoice() {
+    try {
+      const saved = localStorage.getItem(THEME_KEY);
+      if (THEMES.some((t) => t.id === saved)) return saved;
+    } catch (err) { /* no storage: the choice simply does not stick */ }
+    return 'auto';
+  }
+
+  /** Both palettes are in styles.css; this only says which one is in force. */
+  function applyTheme(choice) {
+    const dark = choice === 'dark' || (choice === 'auto' && !!darkQuery && darkQuery.matches);
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+    for (const b of document.getElementById('themes').children) {
+      const on = b.dataset.id === choice;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
+  }
+
+  function wireTheme() {
+    const host = document.getElementById('themes');
+    host.innerHTML = '';
+    for (const t of THEMES) {
+      const b = el('button', 'pip');
+      b.type = 'button';
+      b.dataset.id = t.id;
+      b.textContent = t.label;
+      b.title = t.title;
+      b.addEventListener('click', () => {
+        try { localStorage.setItem(THEME_KEY, t.id); } catch (err) { /* no storage */ }
+        applyTheme(t.id);
+      });
+      host.appendChild(b);
+    }
+    // On auto the page follows a system that changes under it (a machine that goes dark at sunset).
+    if (darkQuery && darkQuery.addEventListener) {
+      darkQuery.addEventListener('change', () => applyTheme(themeChoice()));
+    }
+    applyTheme(themeChoice());
+  }
+
   // ---------- playback ----------
 
   function clearAdvance() {
@@ -682,6 +734,7 @@
 
     Engine.start(scenarioId);
     wireBoard();
+    wireTheme();
     Engine.onchange(onEmit);
     buildChrome();
     onEmit(Engine.current(), Engine.index, Engine.steps().length);
