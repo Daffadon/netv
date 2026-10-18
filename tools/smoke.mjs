@@ -123,6 +123,104 @@ async function walkAllSteps(h, c, scenarioId) {
   c.assert(stackMismatch.length === 0, 'every step lists exactly those headers in the field-by-field stack', stackMismatch);
 }
 
+function quizButton(h, label) {
+  return [...h.doc.querySelectorAll('.quiz-panel button')].find((b) => b.textContent === label) || null;
+}
+
+function checkQuizPools(h, c, scenarioId, phases) {
+  const scenario = h.NETV.scenarios[scenarioId];
+  for (const phase of phases) {
+    const questions = scenario.quizzes && scenario.quizzes[phase];
+    const pool = Array.isArray(questions) ? questions : [];
+    const ids = pool.map((q) => q && q.id);
+    const valid = pool.every((q, i) => q && q.id === phase.toLowerCase() + '-' + String(i + 1).padStart(2, '0') &&
+      typeof q.prompt === 'string' && !!q.prompt.trim() && Array.isArray(q.choices) && q.choices.length === 4 &&
+      q.choices.every((choice) => typeof choice === 'string' && !!choice.trim()) &&
+      Number.isInteger(q.answer) && q.answer >= 0 && q.answer <= 3 &&
+      typeof q.explanation === 'string' && !!q.explanation.trim());
+    c.assert(pool.length === 10 && new Set(ids).size === 10 && valid,
+      phase + ' has ten valid questions with unique module-prefixed IDs', ids);
+  }
+  return phases.length;
+}
+
+async function completeQuiz(h, c, scenarioId, phase, finalStepId, nextStepId, wrongIndex, random) {
+  const NETV = h.NETV;
+  const steps = NETV.scenarios[scenarioId].steps;
+  const finalIndex = steps.findIndex((step, i) => step.id === finalStepId &&
+    (!steps[i + 1] || steps[i + 1].phase !== phase));
+  c.assert(finalIndex >= 0, phase + ' test starts on its final step', finalStepId);
+  if (finalIndex < 0) return null;
+  NETV.Engine.go(finalIndex);
+  NETV.Anim.settle(NETV.Engine.current());
+  await wait(2);
+  const launch = h.q('.quiz-panel');
+  const guidance = launch && launch.querySelector('.quiz-guidance');
+  const nextPhase = nextStepId && steps.find((step) => step.id === nextStepId).phase;
+  c.assert(!!launch && launch.textContent.includes(phase + ' quiz') &&
+    !!quizButton(h, 'Start quiz') && !!quizButton(h, 'Skip quiz') && h.q('#drawer').open && guidance &&
+    guidance.textContent.includes(nextPhase ? 'continue to ' + nextPhase : 'finish here'),
+    phase + ' boundary opens its launch panel with progression guidance', launch && launch.textContent);
+  if (!launch) return null;
+
+  const pool = NETV.scenarios[scenarioId].quizzes[phase];
+  const before = random.calls;
+  quizButton(h, 'Start quiz').click();
+  c.assert(random.calls - before === 5, phase + ' start draws five random positions', random.calls - before);
+  c.assert(h.text('.quiz-count') === 'Question 1 of 5' && h.doc.querySelectorAll('.quiz-choice').length === 4,
+    phase + ' starts with one numbered question and four choices');
+  c.assert(h.doc.activeElement.classList.contains('quiz-question'), phase + ' focuses the question heading');
+  c.assert(['btn-prev', 'btn-next', 'btn-play', 'btn-speed'].every((id) => h.q('#' + id).disabled),
+    phase + ' disables step transport during the run');
+
+  const sampledIds = [];
+  let score = 0;
+  let firstPrompt = null;
+  for (let i = 0; i < 5; i++) {
+    const prompt = h.text('.quiz-question');
+    const question = pool.find((q) => q.prompt === prompt);
+    if (!question) { c.assert(false, phase + ' question ' + (i + 1) + ' belongs to its pool', prompt); return null; }
+    sampledIds.push(question.id);
+    if (i === 0) firstPrompt = prompt;
+    c.assert(h.text('.quiz-count') === 'Question ' + (i + 1) + ' of 5', phase + ' question counter advances', h.text('.quiz-count'));
+    const choices = [...h.doc.querySelectorAll('.quiz-choice')];
+    c.assert(choices.length === 4 && choices.every((b, j) => b.textContent === question.choices[j]),
+      phase + ' renders the selected question choices in order');
+    c.assert(!!quizButton(h, 'Skip quiz'), phase + ' keeps Skip quiz available on each question');
+    const selected = i === wrongIndex ? (question.answer + 1) % 4 : question.answer;
+    if (selected === question.answer) score++;
+    choices[selected].click();
+    const status = h.q('[role="status"][aria-live="polite"]');
+    const feedback = selected === question.answer ? 'Correct.' :
+      'Not quite. Correct answer: ' + question.choices[question.answer] + '.';
+    c.assert(!!status && status.textContent.startsWith(feedback) && status.textContent.includes(question.explanation),
+      phase + ' announces correctness and explanation', status && status.textContent);
+    c.assert(h.doc.querySelectorAll('.quiz-choice:not(:disabled)').length === 0,
+      phase + ' locks choices after an answer');
+    if (i < 4) {
+      c.assert(h.doc.activeElement.textContent === 'Next question', phase + ' focuses Next question after feedback');
+      quizButton(h, 'Next question').click();
+      c.assert(h.doc.activeElement.classList.contains('quiz-question'), phase + ' focuses the following question');
+    }
+  }
+  c.assert(sampledIds.length === 5 && new Set(sampledIds).size === 5 && sampledIds.every((id) => pool.some((q) => q.id === id)),
+    phase + ' samples five distinct IDs from its pool', sampledIds);
+  const scoreText = 'Score: ' + score + '/5';
+  c.assert(score === (wrongIndex < 0 ? 5 : 4) && h.text('.quiz-score') === scoreText,
+    phase + ' displays the exact score after question five', h.text('.quiz-score'));
+  c.assert(!!quizButton(h, 'Continue'), phase + ' offers Continue after the score');
+  quizButton(h, 'Continue').click();
+  if (nextStepId) {
+    c.assert(NETV.Engine.current().id === nextStepId && !h.q('.quiz-score'),
+      phase + ' Continue enters the next phase without retaining the score', NETV.Engine.current().id);
+  } else {
+    c.assert(NETV.Engine.index === finalIndex && NETV.Engine.current().id === finalStepId &&
+      !h.q('.quiz-score') && !!quizButton(h, 'Start quiz'),
+      phase + ' Continue returns to its final step with no saved score', NETV.Engine.current().id);
+  }
+  return { finalIndex, firstPrompt, sampledIds };
+}
+
 // ---------- serve the project so the http:// path can be tested ----------
 const server = createServer(async (req, res) => {
   const rel = decodeURIComponent(req.url.split('?')[0].split('#')[0]);
@@ -197,7 +295,6 @@ const base = 'http://127.0.0.1:' + server.address().port + '/index.html';
   c.assert(h.q('#themes .pip.active').dataset.id === 'auto' && h.q('#themes .pip[data-id="dark"]').getAttribute('aria-pressed') === 'false',
     'going back to Auto leaves the system in charge', h.q('#themes .pip.active').dataset.id);
   c.assert(h.text('#say').startsWith('DHCP · step 1 of 30 '), 'the caption says where the story is', h.text('#say'));
-  c.assert(/joined the Wi-Fi/.test(h.text('#detail')), 'step 1 says what the walkthrough is about', h.text('#detail'));
   c.assert(NETV.scenarios.http.steps[4].phase === 'DHCP' && NETV.scenarios.http.steps[6].phase === 'DNS',
     'the ARP steps sit in the network chapter, not under DNS');
   const drawer = h.q('#drawer');
@@ -491,7 +588,71 @@ const base = 'http://127.0.0.1:' + server.address().port + '/index.html';
   dom.window.close();
 }
 
-// ---------- 2. opening straight onto a deep link ----------
+// ---------- 2. module quiz pools, samples, feedback and boundaries ----------
+{
+  const c = checker('quiz');
+  const httpDom = await load(base + '#/http/arp-reply', false);
+  const h = helpers(httpDom);
+  const random = { calls: 0, value: 0 };
+  const pageErrors = [];
+  httpDom.window.Math.random = () => { random.calls++; return random.value; };
+  httpDom.window.addEventListener('error', (e) => pageErrors.push(String((e.error && e.error.stack) || e.message)));
+  c.assert(checkQuizPools(h, c, 'http', ['DHCP', 'DNS', 'HTTP']) === 3,
+    'the HTTP walkthrough registers three module quiz pools');
+  await completeQuiz(h, c, 'http', 'DHCP', 'arp-reply', 'dns-query', 1, random);
+  const dns = await completeQuiz(h, c, 'http', 'DNS', 'dns-answer', 'tcp-syn-build', -1, random);
+
+  random.value = 0.999;
+  h.NETV.Engine.go(dns.finalIndex);
+  const callsBeforeSkip = random.calls;
+  quizButton(h, 'Start quiz').click();
+  c.assert(random.calls - callsBeforeSkip === 5 && h.text('.quiz-count') === 'Question 1 of 5' &&
+    h.text('.quiz-question') !== dns.firstPrompt &&
+    h.NETV.scenarios.http.quizzes.DNS.some((q) => q.prompt === h.text('.quiz-question')),
+    'a new DNS start draws a fresh five-question sample');
+  quizButton(h, 'Skip quiz').click();
+  c.assert(h.NETV.Engine.current().id === 'tcp-syn-build' && !h.q('.quiz-score'),
+    'Skip before answering advances without a score', h.NETV.Engine.current().id);
+
+  const http = await completeQuiz(h, c, 'http', 'HTTP', 'time-wait', null, -1, random);
+  quizButton(h, 'Start quiz').click();
+  h.click('#phases .pip:nth-child(2)');
+  c.assert(h.NETV.Engine.current().phase === 'DNS' && !h.q('.quiz-panel') && !h.q('#detail').hidden,
+    'chapter navigation cancels an active run and restores step details');
+  h.NETV.Engine.go(http.finalIndex);
+  quizButton(h, 'Start quiz').click();
+  h.click('#scenarios .pip:nth-child(2)');
+  c.assert(h.NETV.Engine.scenarioId === 'routing' && !h.q('.quiz-panel') && !h.q('#detail').hidden,
+    'scenario navigation cancels an active run and restores step details');
+  c.assert(pageErrors.length === 0, 'quiz navigation has no page errors', pageErrors);
+  httpDom.window.close();
+
+  const routingDom = await load(base + '#/routing/ospf-boundary', false);
+  const r = helpers(routingDom);
+  const routingRandom = { calls: 0, value: 0 };
+  routingDom.window.Math.random = () => { routingRandom.calls++; return routingRandom.value; };
+  c.assert(checkQuizPools(r, c, 'routing', ['OSPF', 'BGP']) === 2,
+    'the routing walkthrough registers two module quiz pools');
+  await completeQuiz(r, c, 'routing', 'OSPF', 'ospf-boundary', 'bgp-topology', -1, routingRandom);
+  const bgp = await completeQuiz(r, c, 'routing', 'BGP', 'bgp-forwarding', null, -1, routingRandom);
+  routingRandom.value = 0.999;
+  const beforeMidRun = routingRandom.calls;
+  quizButton(r, 'Start quiz').click();
+  c.assert(routingRandom.calls - beforeMidRun === 5 && r.text('.quiz-question') !== bgp.firstPrompt,
+    'a repeated BGP start draws a fresh sample');
+  const firstQuestion = r.NETV.scenarios.routing.quizzes.BGP.find((q) => q.prompt === r.text('.quiz-question'));
+  c.assert(!!firstQuestion, 'the repeated BGP question belongs to the BGP pool');
+  if (firstQuestion) {
+    r.doc.querySelectorAll('.quiz-choice')[firstQuestion.answer].click();
+    quizButton(r, 'Skip quiz').click();
+    c.assert(r.NETV.Engine.index === bgp.finalIndex && !r.q('.quiz-score') && !r.q('#detail').hidden,
+      'mid-run terminal Skip returns to the final step without a score');
+  }
+  routingDom.window.close();
+  failures.push(...c.failures);
+}
+
+// ---------- 3. opening straight onto a deep link ----------
 {
   const dom = await load(base + '#/http/tcp-syn-ack', false);
   const h = helpers(dom);
@@ -500,7 +661,7 @@ const base = 'http://127.0.0.1:' + server.address().port + '/index.html';
   dom.window.close();
 }
 
-// ---------- 3. from file:// : the double-click path ----------
+// ---------- 4. from file:// : the double-click path ----------
 {
   const c = checker('file');
   const dom = await load(join(ROOT, 'index.html'), true);

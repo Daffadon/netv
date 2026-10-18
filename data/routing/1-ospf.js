@@ -4,13 +4,13 @@ NETV.addSteps('routing', [
   {
     id: 'ospf-process-up',
     phase: 'OSPF',
-    title: 'A routing process starts on one interface',
+    title: 'Each router starts with a map of its own links',
     say: 'A router turns on its map. It knows its own links and nothing else.',
     actor: 'core-a',
     dir: 'none',
     osi: [3],
     pdu: 'nothing on the wire yet',
-    explain: 'Each router runs a process that keeps a picture of the network. It gives itself a name, the highest address on its own loopback, and joins one part of the network called an area. At the start its map holds only the links it can see directly, so it has to find the other routers before it can build anything larger.',
+    explain: 'OSPF (Open Shortest Path First) is a protocol routers use to share link information inside one network. Each router begins with only the links it can see directly. It uses a router ID (stable name); here, this is the highest address on a loopback, a virtual interface that stays up while the router runs. It joins an area, a part of the network whose routers share the same map.',
     analogy: 'A new neighbour sketches only their own street until they meet the people living around the corner.',
     changes: ['Router ID 192.0.2.5 chosen as the highest loopback address', 'The database is empty except for the router\'s own links'],
     cite: [
@@ -45,8 +45,8 @@ NETV.addSteps('routing', [
   {
     id: 'ospf-two-way',
     phase: 'OSPF',
-    title: 'The neighbour replies and a leader is chosen',
-    say: 'The reply names this router back, so the two accept each other and pick a leader.',
+    title: 'The neighbour replies; routers elect a designated router',
+    say: 'The two confirm two-way contact, then elect a designated router and a backup.',
     actor: 'isp',
     hop: ['isp', 'core-a'],
     dir: 'out',
@@ -57,7 +57,7 @@ NETV.addSteps('routing', [
       ip: { version: 4, headerLength: 20, ttl: 1, protocol: '89 (OSPF)', src: '198.51.100.1', dst: '224.0.0.5' },
       ospf: { version: 2, type: '1 (Hello)', routerId: '192.0.2.3', areaId: '0.0.0.0 (backbone)', helloInterval: '10 s', routerDeadInterval: '40 s', routerPriority: 1, designatedRouter: '192.0.2.5 (core A)', backupDesignatedRouter: '192.0.2.4 (core B)', neighbors: '192.0.2.5 (core A)' }
     },
-    explain: 'When a router hears its own name inside a neighbour greeting, the two are said to be two-way and may now trade maps. On a wire shared by many routers, every pair talking to every other would grow far too fast, so the routers choose one to speak for the whole segment. The one with the highest priority wins, a tie goes to the highest name, and the runner-up stands by as a backup. Only the chosen pair and the backup reach a full relationship.',
+    explain: 'When a router hears its own name in a neighbour’s Hello, the two are two-way: each knows the other heard it. On a shared link, routers elect a designated router (DR) to coordinate map exchanges and a backup designated router (BDR) to take over if needed. Without this pair, every router would need a full relationship with every other router. The router with the highest priority wins; a tie is settled by the highest router ID.',
     analogy: 'A crowd picks one person to speak for everyone, with a stand-in ready if that person steps away.',
     changes: ['This router hears itself named, so the pair is two-way', 'The greeting now carries the chosen leader and its stand-in'],
     cite: [
@@ -118,7 +118,7 @@ NETV.addSteps('routing', [
   {
     id: 'ospf-lsa-flood',
     phase: 'OSPF',
-    title: 'Each router describes itself and passes it on',
+    title: 'Each router sends a link-state advertisement describing its links',
     say: 'Every router writes down its own links and shares that note with the area.',
     actor: 'core-a',
     hop: ['core-a', 'core-b'],
@@ -130,7 +130,7 @@ NETV.addSteps('routing', [
       ip: { version: 4, headerLength: 20, ttl: 1, protocol: '89 (OSPF)', src: '192.0.2.5', dst: '224.0.0.5' },
       ospf: { version: 2, type: '4 (Link State Update)', routerId: '192.0.2.5', areaId: '0.0.0.0 (backbone)', numberOfLsa: 1, lsaType: '1 (Router-LSA)', linkStateId: '192.0.2.5', advertisingRouter: '192.0.2.5', lsAge: '0 s', sequenceNumber: '0x80000001', lsaChecksum: '0x7c3f', links: 'to core B and to the border router', metric: 1 }
     },
-    explain: 'A router describes itself in one entry: its name, and for each link the neighbour it reaches and what that link costs. It sends the entry to every neighbouring router on the segment, and each of those passes a copy on again, until every router holds it. Each entry carries a version number and an age, so a copy that arrives late can never overwrite a newer one.',
+    explain: 'Each router writes one link-state advertisement (LSA), a map entry listing its router ID and directly connected links, with a cost for each. It sends this entry to neighbours; they pass a copy on until every router in the area has it. This spreading is called flooding. The sequence number distinguishes newer versions, and the age lets old entries expire. An LSA describes links; it is not the final route table.',
     analogy: 'A notice pinned in one hallway is copied and pinned in every other hallway until the whole building has read it.',
     changes: ['Sent to the whole area, one link at a time', 'Every router ends holding an identical copy of the map'],
     cite: [

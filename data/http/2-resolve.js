@@ -2,7 +2,7 @@ NETV.addSteps('http', [
   {
     id: 'arp-request',
     phase: 'DHCP',
-    title: 'The laptop asks the LAN who owns the gateway address',
+    title: 'The laptop asks the local network who owns the gateway IP',
     say: 'The laptop must address the router on this wire, so it asks the whole room who owns it.',
     actor: 'client',
     hop: ['client', 'ap', 'gw'],
@@ -21,10 +21,10 @@ NETV.addSteps('http', [
         targetIp: '192.168.1.1'
       }
     },
-    explain: 'The laptop knows the gateway\'s address is 192.168.1.1, but a frame on this wire needs the gateway\'s hardware address, and the laptop does not have it. So the laptop asks every machine on the local network at once, sending the question to the broadcast address that all stations read. This question carries no outer network header: it only pairs an address with a hardware address, so it stays on the local link and is never handed to a router. The answer fills in that hardware address for the frames the laptop sends next.',
+    explain: 'Address Resolution Protocol (ARP) finds the hardware address (MAC address) for a local IP. The laptop knows the gateway IP 192.168.1.1, but Ethernet or Wi-Fi must deliver each frame to the next device using that device’s MAC address (the hardware address of its network card). The laptop does not know the gateway’s MAC address yet, so it asks every device on the local network. The question is broadcast locally and contains no IP packet, so routers do not forward it. The answer pairs the gateway IP with its MAC address for future frames.',
     analogy: 'A shout across a crowded lobby asking who holds the front-door key gets an answer from the person who owns it.',
     changes: ['Target MAC starts as 00:00:00:00:00:00 — the value being asked for'],
-    note: 'Because ARP protects no outer network layer, it is trusted implicitly by design, which makes it a classic target for spoofing on untrusted L2 segments.',
+    note: 'ARP has no authentication, so a device can accept a false IP-to-MAC mapping from another device on the same local network. An attacker can use this to redirect local traffic (ARP spoofing).',
     cite: [
       { rfc: 826, sec: 'Packet format', title: 'Packet format' },
       { rfc: 894, sec: 'Broadcast Address', title: 'Broadcast Address' },
@@ -64,8 +64,8 @@ NETV.addSteps('http', [
   {
     id: 'dns-query',
     phase: 'DNS',
-    title: 'The stub resolver hands the question to one recursive resolver',
-    say: 'Now the laptop asks a name server: what is the address behind daffapn.my.id?',
+    title: 'The laptop asks its configured DNS resolver for the website IP address',
+    say: 'DNS turns website names into IP addresses; the laptop asks its configured resolver.',
     actor: 'client',
     hop: ['client', 'ap', 'gw', 'isp', 'resolver'],
     dir: 'out',
@@ -77,7 +77,7 @@ NETV.addSteps('http', [
       udp: { srcPort: 49153, dstPort: 53 },
       dns: { id: '0x3a7f', rd: 1, question: 'daffapn.my.id.', qtype: 'A', qclass: 'IN' }
     },
-    explain: 'The name lookup program inside the operating system does not chase the answer itself. It hands the name to the resolver its network settings came with, at 198.51.100.53, and asks that resolver to do the walking. The question fits in one datagram to port 53, so no connection is set up before the first byte of the query. This is the first packet to leave the home network, so the home router rewrites the private source address for this flow on the way out.',
+    explain: 'The operating system has a small DNS client, called a stub resolver, that sends the question to the configured recursive resolver at 198.51.100.53. That server looks up the answer on the laptop’s behalf. The query fits in one UDP message to port 53, so no TCP connection is needed. This is the first packet to leave the home network; the home router replaces the private source address with its public address so the reply can find its way back.',
     analogy: 'Handing one written question to a librarian who will search every shelf for you saves you the walk.',
     changes: [
       'Source 192.168.1.87 → 198.51.100.23 at gw — the full NAPT mechanism is explained in the connection phase',
@@ -142,7 +142,7 @@ NETV.addSteps('http', [
         answers: 'daffapn.my.id. 3600 IN A 203.0.113.80'
       }
     },
-    explain: 'This reply is a real answer rather than a referral: it carries the record daffapn.my.id. 3600 IN A 203.0.113.80. Flags in the message confirm the exchange: it is marked as a response, it echoes the request for recursion, and the server states that it offers recursion. The 3600 is how long the record may be kept, and the operating system holds the name-to-address mapping in its cache for that many seconds, so the next request for this name is answered on the laptop with no packet leaving it. The lookup has produced an address, and turning that address into a connection comes next.',
+    explain: 'This reply is a real answer rather than a referral: it carries the record daffapn.my.id. 3600 IN A 203.0.113.80. An A record maps a website name to an IPv4 address, here 203.0.113.80. The flags say this is a response and that the resolver did the lookup on the laptop’s behalf. The 3600 is how many seconds the record may be kept, so the operating system caches the name-to-address mapping for an hour. The next connection can use that IP without another DNS lookup.',
     analogy: 'A shop assistant writes the price on a slip and says how long the quote stays good.',
     changes: ['The laptop now has a destination IP for daffapn.my.id, so no further DNS is needed for 3600 seconds'],
     note: 'The address shown, 203.0.113.80, is a documentation address from RFC 5737 §3, not the address daffapn.my.id really resolves to: a real lookup returns whatever the zone holds at that moment, and that changes as services move.',

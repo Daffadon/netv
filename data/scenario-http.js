@@ -41,6 +41,6 @@
     ],
 
     // Short blast of context shown above the step list.
-    preamble: 'The laptop has just joined the Wi-Fi. It has no IP address yet, so the walkthrough starts before HTTP does.'
+    preamble: 'The laptop has just joined Wi-Fi and has no IP address yet. HTTP (Hypertext Transfer Protocol) is the web’s request-and-response protocol: this walkthrough gets an address, finds the server, opens a connection, then fetches the page. It is an entry point; RFC citations lead to full protocol details.',
   });
 })(globalThis);

@@ -2,8 +2,8 @@ NETV.addSteps('http', [
   {
     id: 'tcp-syn-build',
     phase: 'HTTP',
-    title: 'The transport layer builds a SYN segment',
-    say: 'Before any words are exchanged, the two sides agree how to count the bytes.',
+    title: 'TCP opens a connection with its first SYN message',
+    say: 'First of three TCP handshake messages: the client opens a connection before sending the request.',
     actor: 'client',
     dir: 'out',
     osi: [4],
@@ -22,7 +22,7 @@ NETV.addSteps('http', [
         options: 'MSS=1460, SACK permitted, window scale 7'
       }
     },
-    explain: 'The transport layer builds this segment before anything below it adds headers. It takes an unused local port, 49152, as the source and aims at port 80, and it sets the SYN flag while carrying no application data. That flag starts the negotiation of sequence numbers: this end offers its starting number, and the MSS option states the largest segment it will accept, so both sides learn each other\'s limits before any data moves. The starting number is random instead of zero, so an attacker who cannot watch the connection cannot guess what comes next and slip in a forged segment.',
+    explain: 'TCP (Transmission Control Protocol) reliably carries bytes between programs and opens a connection before any HTTP data moves. The client picks a temporary local port, 49152, and sends a SYN, the opening message, to the server’s web port 80. The SYN carries a random initial sequence number (the starting byte number); the MSS (Maximum Segment Size) option states the largest piece of data this end will accept. The server replies with its own starting number and limit, then the client confirms them before sending the request. A random starting number also makes it harder for an off-path attacker to guess a valid packet.',
     analogy: 'Two neighbours agree, before saying a word, which point they will start counting from and how big a bundle each can take.',
     changes: [
       'An ephemeral source port 49152 is chosen for this connection',
@@ -49,7 +49,7 @@ NETV.addSteps('http', [
       ip: { version: 4, headerLength: 20, totalLength: 60, ttl: 64, protocol: '6 (TCP)', src: '192.168.1.87', dst: '203.0.113.80' },
       tcp: { srcPort: 49152, dstPort: 80, seq: '0x1a2b3c4d', flags: 'SYN', window: 65535, options: 'MSS=1460' }
     },
-    explain: 'The switch and access point forward on the destination hardware address alone and cannot lower the hop counter. The home router replaces the private address 192.168.1.87 with its public address 198.51.100.23 and records the mapping, so the reply finds its way back to the right machine. Each router then subtracts one from the hop counter and drops the packet with an ICMP Time Exceeded message once it reaches zero, so no packet circles forever. Every hop builds a fresh frame for the next link, so the hardware addresses change at each hop but the IP addresses do not, and the backbone routers choose a path from tables learned with BGP.',
+    explain: 'The switch and access point forward on the destination hardware address alone and cannot lower the hop counter. The home router performs NAT (Network Address Translation): it replaces the private address 192.168.1.87 with its public address 198.51.100.23 and records the mapping, so the reply finds its way back to the right machine. Each router subtracts one from the hop counter and drops the packet with an ICMP (Internet Control Message Protocol) Time Exceeded error when it reaches zero, so no packet circles forever. Every hop builds a fresh frame for the next link, so hardware addresses change at each hop but IP addresses do not. OSPF (Open Shortest Path First) works inside a network; BGP (Border Gateway Protocol) helps different networks exchange routes.',
     analogy: 'A reception desk writes its own return name on your parcel, and each postman crosses a day off its delivery window.',
     changes: [
       'TTL 64 → 63 at the home router',
@@ -73,7 +73,7 @@ NETV.addSteps('http', [
     id: 'tcp-syn-ack',
     phase: 'HTTP',
     title: 'The server answers with SYN, ACK',
-    say: 'The server answers in kind, and the connection is half open.',
+    say: 'The server confirms the client’s starting number and sends its own; the client still needs to confirm it.',
     actor: 'server',
     hop: ['server', 'edge', 'transit', 'isp', 'gw', 'ap', 'client'],
     dir: 'in',
@@ -94,7 +94,7 @@ NETV.addSteps('http', [
       },
       ethernet: { src: '00:1b:21:3c:4d:5e', type: '0x0800 (IPv4)', fcs: 'valid' }
     },
-    explain: 'The server already listens on port 80, and this segment matches that socket, so the kernel creates a new connection record keyed by the client\'s four values: source address, source port, destination address, and destination port. It answers with its own starting sequence number and its MSS, and it sets both SYN and ACK: SYN to open the reverse direction, ACK to confirm the client\'s sequence number by sending it back plus one. The reply follows the same path home with the hop counter lowered once per router, and by the time it arrives the destination port reads 49152 because the home router mapped the flow back to the laptop.',
+    explain: 'The server listens on port 80 for web requests. When the SYN arrives, TCP creates a connection record identified by the client and server IP addresses and port numbers. The server sends its own starting sequence number and MSS. SYN carries that number; ACK confirms the client’s starting number by returning the next number expected. The reply follows the route home; the home router maps the public address and port back to the laptop’s private address and port.',
     analogy: 'A librarian with a desk already open takes your slip, starts a new card for you both and writes her own reference on it.',
     changes: [
       'TTL 64 → 63 at the datacenter edge router',
@@ -129,7 +129,7 @@ NETV.addSteps('http', [
         flags: 'ACK'
       }
     },
-    explain: 'This third leg finishes the three-way handshake: the client confirms the server\'s sequence number and both ends move to ESTABLISHED. None of the three segments carried any data, so a full round trip passes before a single byte of the request can move, which makes opening a fresh connection costly and reusing one worthwhile. The connection is now symmetric and full-duplex, so either side may send whenever it likes without waiting for the other.',
+    explain: 'The third message finishes the three-way handshake: the client confirms the server’s starting number. Both sides now know where byte counting starts, so either can send while receiving. None of the first three messages carried HTTP data; opening a new connection costs a round trip before the request can start.',
     analogy: 'The two finish shaking hands before either says a word, and now either can talk at any moment.',
     changes: [
       'Client state: SYN-SENT → ESTABLISHED',

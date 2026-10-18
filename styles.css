@@ -534,6 +534,23 @@ button.primary:active:not(:disabled) { background: var(--accent-press); border-c
 .drawer-body { padding: 18px 22px 30px; }
 
 .detail { display: grid; gap: 18px; font-size: 14.5px; }
+.quiz-panel {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 18px;
+  padding: 14px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+.quiz-title { margin: 0; font: 600 15px var(--sans); color: var(--accent-text); }
+.quiz-count { margin: 0; color: var(--muted); font: 12px var(--mono); }
+.quiz-guidance { margin: 0; line-height: 1.5; }
+.quiz-question { margin: 0; font: 600 15px/1.45 var(--sans); }
+.quiz-panel button { width: 100%; text-align: left; }
+.quiz-panel button.primary { text-align: center; }
+.quiz-feedback { margin: 2px 0; line-height: 1.55; }
+.quiz-score { margin: 0; font: 600 15px var(--sans); }
 /* the field-by-field strip scrolls sideways inside the panel; without this its intrinsic width
    would widen the whole grid (and the panel) to fit it */
 .detail > * { min-width: 0; }

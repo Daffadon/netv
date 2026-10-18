@@ -18,7 +18,7 @@ NETV.addSteps('http', [
         Connection: 'keep-alive'
       }
     },
-    explain: 'The application layer writes the request as plain text: a start line and then the field lines. Every field line ends with CRLF, and a blank line after the last field ends the header section. A GET has no body, so the request never declares a length, and the target is only the path; the separate Host field supplies the site name the path leaves out, because one address can host many sites. GET is safe and idempotent, so the browser may retry or cache it without surprising the server.',
+    explain: 'The browser writes an HTTP request as text: the first line says what it wants, then header lines add details. Each header ends with CRLF (a line break); a blank line marks the end of headers. GET / asks the server to return the site’s home page and carries no request body. Host names the site because several sites can share one IP address. GET is intended to read, not change, server state; repeating it has the same intended effect (idempotent), so it is safe to retry. Whether the response may be cached depends on its cache rules.',
     analogy: 'Think of a note that names the building and the room, so the reader knows exactly which place you mean.',
     cite: [
       { rfc: 9110, sec: '9.3.1', title: 'GET' },
@@ -146,7 +146,7 @@ NETV.addSteps('http', [
         Connection: 'keep-alive'
       }
     },
-    explain: 'Every router forwards the packet using only its destination address, one hop at a time, and keeps no memory of the connection: each packet is handled on its own. The path was chosen by BGP, which prefers policy and reachability over raw distance, so it is not always the shortest and can change while the connection stays open. By now the home router has looked up the binding for the private address and written its own public address into the packet, so it leaves with the translated source.',
+    explain: 'Routers send the packet toward its destination IP one hop at a time, using a route table to choose the next router. Those tables are prepared before the request: OSPF (Open Shortest Path First) shares a map inside one network; BGP (Border Gateway Protocol) exchanges reachable address blocks between networks, and each network uses policy to choose routes. A chosen path need not be physically shortest and can change while the connection stays open. The home router uses its NAT mapping to replace the laptop’s private source IP with its public IP and keep track of the change, so the reply can be matched when it returns.',
     analogy: 'A courier chain passes each parcel onward reading only the label on the front, and each office stamps its own return address.',
     changes: [
       'NAT rewrites the source address: 192.168.1.87 → 198.51.100.23',
@@ -208,7 +208,7 @@ NETV.addSteps('http', [
         Host: 'daffapn.my.id'
       }
     },
-    explain: 'A server process was waiting for a new connection on a listening socket, and once the connection was complete it received a fresh file descriptor for it. The server reads the start line and splits it into method, target, and version, then checks that a Host field is present and that the target is only a path. It routes on the Host and the path, because several sites can share one address and one port, and this lookup is where the right site is chosen.',
+    explain: 'A web server waits for connections on port 80. Once TCP connects, the server reads the request. GET / HTTP/1.1 means “use GET to fetch / with HTTP/1.1”; Host daffapn.my.id selects the right site because several sites can share one IP address and port. The server then uses path / to choose the page.',
     analogy: 'Like a hotel reception that reads the room name on your booking and sends you to the right door.',
     cite: [
       { rfc: 9112, sec: '2.2', title: 'Message Parsing' },
@@ -235,7 +235,7 @@ NETV.addSteps('http', [
         Date: 'Mon, 13 Oct 2026 21:30:00 GMT'
       }
     },
-    explain: 'The handler runs and decides what to send back: it picks a representation for the resource and works out the metadata that describes it. The media type and charset tell the client how to read the bytes, the length says how many bytes to expect, and the ETag gives a version label the client can use later for conditional requests. None of these fields is the response text itself; that is written in the next step.',
+    explain: 'The server application chooses a page to send (the representation) and labels its bytes. Content-Type says the body is HTML encoded as UTF-8; Content-Length says it has 1256 bytes; Date says when the server made the response. ETag is a version label the browser can use later to check whether the page changed. These labels describe the body but are not the body; the next step sends the HTML bytes.',
     analogy: 'Like a librarian who chooses the right book and writes its details on the slip before handing it over.',
     note: 'The body is 1256 bytes, which fits inside one 1460-byte MSS segment, so the response will not need to be split.',
     cite: [

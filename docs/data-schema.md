@@ -20,6 +20,11 @@ data/http/5-response.js     steps (owns "P4", "P5")
 data/scenario-routing.js    the routing scenario: two maps, one per chapter, and its phase order
 data/routing/1-ospf.js      steps (owns "OSPF")
 data/routing/2-bgp.js       steps (owns "BGP")
+data/quizzes/dhcp.js        ten DHCP quiz questions
+data/quizzes/dns.js         ten DNS quiz questions
+data/quizzes/http.js        ten HTTP quiz questions
+data/quizzes/ospf.js        ten OSPF quiz questions
+data/quizzes/bgp.js         ten BGP quiz questions
 ```
 
 Plain `<script>` tags, **not** ES modules: `file://` blocks module imports, and this page must
@@ -33,6 +38,22 @@ Steps appended in script order. A file owns its own steps; never write a step an
 A chapter may span files — the DHCP chapter holds the two ARP steps from `2-resolve.js`. All values
 are literals — there is no inheritance between steps and no computed state. Redundancy is accepted
 so each file is readable on its own.
+
+Each quiz bank is one plain-script file with one registration call, loaded after its scenario and
+step files and before the engine:
+
+```js
+NETV.addQuiz('http', 'DHCP', [
+  { id: 'dhcp-01', prompt: '...', choices: ['...', '...', '...', '...'], answer: 0, explanation: '...' }
+]);
+```
+
+`NETV.addQuiz(scenarioId, phase, questions)` stores the supplied array at
+`NETV.scenario(scenarioId).quizzes[phase]` and returns the scenario. Each question has a stable
+module-prefixed ID, a non-empty prompt and explanation, exactly four non-empty choice strings, and
+an integer `answer` index from 0 through 3. Each of the five module banks stores ten questions.
+Starting a module quiz uses a partial Fisher–Yates shuffle to draw five distinct questions in a
+fresh random order; the sample and score exist only for that run and are not saved.
 
 A scenario with one map declares `nodes` and `links` on itself (the HTTP walkthrough). A scenario
 whose chapters need different maps declares `boards: { <phase>: { nodes, links, aria } }` instead,

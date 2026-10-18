@@ -17,6 +17,11 @@ const SCENARIO_FILES = [
   'data/scenario-routing.js',
   'data/routing/1-ospf.js',
   'data/routing/2-bgp.js',
+  'data/quizzes/dhcp.js',
+  'data/quizzes/dns.js',
+  'data/quizzes/http.js',
+  'data/quizzes/ospf.js',
+  'data/quizzes/bgp.js',
   'src/engine.js',
   'src/anim.js',
   'src/ui.js'
@@ -352,6 +357,36 @@ for (const scenarioId of Object.keys(SCENARIOS)) {
   });
 }
 
+// --- 5. every declared module phase has one valid ten-question quiz bank
+for (const scenarioId of Object.keys(SCENARIOS)) {
+  const scenario = NETV.scenarios[scenarioId];
+  if (!scenario) continue;
+  for (const phase of SCENARIOS[scenarioId].phases) {
+    const questions = scenario.quizzes && scenario.quizzes[phase];
+    const where = '[' + scenarioId + '/' + phase + ' quiz] ';
+    if (!Array.isArray(questions)) { err(where + 'no question bank registered'); continue; }
+    if (questions.length !== 10) err(where + 'expected exactly 10 questions, found ' + questions.length);
+    const ids = new Set();
+    questions.forEach((q, i) => {
+      const expectedId = phase.toLowerCase() + '-' + String(i + 1).padStart(2, '0');
+      if (!q || typeof q !== 'object') { err(where + 'question ' + (i + 1) + ' is not an object'); return; }
+      if (typeof q.id !== 'string' || !q.id.trim()) err(where + 'question ' + (i + 1) + ' has no ID');
+      else {
+        if (ids.has(q.id)) err(where + 'duplicate question ID ' + q.id);
+        ids.add(q.id);
+        if (q.id !== expectedId) err(where + 'question ' + (i + 1) + ' must use ID ' + expectedId);
+      }
+      if (typeof q.prompt !== 'string' || !q.prompt.trim()) err(where + q.id + ' has an empty prompt');
+      if (typeof q.explanation !== 'string' || !q.explanation.trim()) err(where + q.id + ' has an empty explanation');
+      if (!Array.isArray(q.choices) || q.choices.length !== 4 || q.choices.some((c) => typeof c !== 'string' || !c.trim())) {
+        err(where + q.id + ' must have exactly four non-empty choice strings');
+      }
+      if (!Number.isInteger(q.answer) || q.answer < 0 || q.answer > 3) err(where + q.id + ' answer must be an integer from 0 through 3');
+    });
+    if (ids.size !== questions.length) err(where + 'question IDs are not unique');
+  }
+}
+
 // --- 6. index.html must load every source and data file that exists on disk
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const onDisk = [];
@@ -377,8 +412,16 @@ for (const f of SCENARIO_FILES) {
 // --- report
 for (const w of warnings) console.log('warn  ' + w);
 for (const e of errors) console.log('ERROR ' + e);
+const quizPools = Object.keys(SCENARIOS).flatMap((id) => {
+  const scenario = NETV.scenarios[id];
+  return SCENARIOS[id].phases.map((phase) => ({
+    phase,
+    count: scenario && scenario.quizzes && scenario.quizzes[phase] ? scenario.quizzes[phase].length : 0
+  }));
+});
 console.log('\n' + Object.keys(SCENARIOS).map((id) => {
   const s = NETV.scenarios[id];
   return (s ? (s.steps || []).length : 0) + ' ' + id;
-}).join(' · ') + ' steps · ' + errors.length + ' errors · ' + warnings.length + ' warnings');
+}).join(' · ') + ' steps · ' + quizPools.length + ' quiz pools (' +
+  quizPools.map((q) => q.phase + ' ' + q.count).join(', ') + ') · ' + errors.length + ' errors · ' + warnings.length + ' warnings');
 process.exit(errors.length ? 1 : 0);

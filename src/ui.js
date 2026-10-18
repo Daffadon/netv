@@ -11,6 +11,7 @@
   let knownAt = [];        // per step index: the set of nodes the story has already used
   let lastStep = null, lastSpeed = null, wasPlaying = false, advanceTimer = null;
   let lastScenarioId = null, lastBoard = null;
+  let quizRun = null, closedBoundary = null;
 
   function el(tag, cls, text) {
     const n = document.createElement(tag);
@@ -142,6 +143,7 @@
     // Opening the panel takes width from the canvas, so the map is fitted into what is left.
     const drawer = document.getElementById('drawer');
     drawer.addEventListener('toggle', () => {
+      if (quizRun && !drawer.open) { drawer.open = true; return; }
       board.parentNode.classList.toggle('drawer-open', drawer.open);
       relayout();
     });
@@ -542,6 +544,161 @@
     host.appendChild(who);
   }
 
+  function isModuleBoundary(index = Engine.index) {
+    const steps = Engine.steps();
+    return !steps[index + 1] || steps[index + 1].phase !== steps[index].phase;
+  }
+
+  function boundaryKey(index = Engine.index) {
+    return Engine.scenarioId + ':' + index;
+  }
+
+  function renderQuizPanel(focusQuestion) {
+    const drawer = document.getElementById('drawer');
+    const body = drawer.querySelector('.drawer-body');
+    const detail = document.getElementById('detail');
+    const old = body.querySelector('.quiz-panel');
+    if (old) old.remove();
+    detail.hidden = !!quizRun;
+    if (!quizRun && (!isModuleBoundary() || closedBoundary === boundaryKey())) return;
+
+    const phase = quizRun ? quizRun.phase : Engine.current().phase;
+    const panel = el('section', 'quiz-panel');
+    let focusTarget = null;
+    panel.appendChild(el('h3', 'quiz-title', phase + ' quiz'));
+    const addButton = (label, primary, action) => {
+      const button = el('button', primary ? 'primary' : null, label);
+      button.type = 'button';
+      button.addEventListener('click', action);
+      panel.appendChild(button);
+      return button;
+    };
+
+    if (!quizRun) {
+      const next = Engine.steps().find((step, i) => i > Engine.index && step.phase !== phase);
+      const guidance = next
+        ? 'You are at the end of ' + phase + '. Start the quiz or choose Skip quiz to continue to ' + next.phase + '.'
+        : 'You are at the end of ' + phase + '. Start the quiz or choose Skip quiz to finish here.';
+      panel.appendChild(el('p', 'quiz-guidance', guidance));
+      addButton('Start quiz', true, startQuiz);
+      addButton('Skip quiz', false, finishQuiz);
+    } else {
+      const question = quizRun.questions[quizRun.index];
+      panel.appendChild(el('p', 'quiz-count', 'Question ' + (quizRun.index + 1) + ' of 5'));
+      const heading = el('h4', 'quiz-question', question.prompt);
+      heading.tabIndex = -1;
+      panel.appendChild(heading);
+      for (let i = 0; i < question.choices.length; i++) {
+        const button = el('button', 'quiz-choice', question.choices[i]);
+        button.type = 'button';
+        button.disabled = quizRun.answered;
+        button.addEventListener('click', () => answerQuiz(i));
+        panel.appendChild(button);
+      }
+      if (quizRun.answered) {
+        const status = el('p', 'quiz-feedback', quizRun.feedback + ' ' + question.explanation);
+        status.setAttribute('role', 'status');
+        status.setAttribute('aria-live', 'polite');
+        panel.appendChild(status);
+        if (quizRun.index === 4) {
+          panel.appendChild(el('p', 'quiz-score', 'Score: ' + quizRun.score + '/5'));
+          focusTarget = addButton('Continue', true, finishQuiz);
+        } else {
+          addButton('Skip quiz', false, finishQuiz);
+          focusTarget = addButton('Next question', true, () => {
+            quizRun.index++;
+            quizRun.answered = false;
+            quizRun.feedback = '';
+            renderQuizPanel(true);
+          });
+        }
+      } else {
+        addButton('Skip quiz', false, finishQuiz);
+        if (focusQuestion) focusTarget = heading;
+      }
+    }
+
+    body.insertBefore(panel, detail);
+    if (focusTarget) focusTarget.focus();
+    if (!quizRun && isModuleBoundary()) {
+      drawer.open = true;
+      drawer.scrollTop = 0;
+    }
+  }
+
+  function startQuiz() {
+    Engine.pause();
+    const phase = Engine.current().phase;
+    const pool = Engine.scenario().quizzes[phase].slice();
+    for (let i = 0; i < 5; i++) {
+      const j = i + Math.floor(Math.random() * (pool.length - i));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    quizRun = {
+      scenarioId: Engine.scenarioId,
+      step: Engine.current(),
+      phase,
+      questions: pool.slice(0, 5),
+      index: 0,
+      score: 0,
+      answered: false,
+      feedback: ''
+    };
+    syncTransport();
+    renderQuizPanel(true);
+  }
+
+  function answerQuiz(choice) {
+    if (!quizRun || quizRun.answered) return;
+    const question = quizRun.questions[quizRun.index];
+    quizRun.answered = true;
+    if (choice === question.answer) {
+      quizRun.score++;
+      quizRun.feedback = 'Correct.';
+    } else {
+      quizRun.feedback = 'Not quite. Correct answer: ' + question.choices[question.answer] + '.';
+    }
+    renderQuizPanel();
+  }
+
+  function finishQuiz() {
+    const completed = quizRun && quizRun.answered && quizRun.index === 4;
+    const next = Engine.steps().findIndex((step, i) => i > Engine.index && step.phase !== Engine.current().phase);
+    quizRun = null;
+    Engine.pause();
+    if (next >= 0) {
+      Engine.go(next);
+      return;
+    }
+    closedBoundary = completed ? null : boundaryKey();
+    renderQuizPanel();
+    syncTransport();
+  }
+
+  function syncTransport() {
+    const disabled = !!quizRun;
+    document.getElementById('btn-prev').disabled = disabled || Engine.atStart();
+    document.getElementById('btn-next').disabled = disabled || Engine.atEnd();
+    const play = document.getElementById('btn-play');
+    play.textContent = Engine.isPlaying() ? '❙❙ Pause' : '▶ Play';
+    play.disabled = disabled || (Engine.atEnd() && !Engine.isPlaying());
+    document.getElementById('btn-speed').disabled = disabled;
+  }
+
+  function advanceStep() {
+    if (quizRun) return;
+    if (isModuleBoundary()) {
+      Engine.pause();
+      if (closedBoundary !== boundaryKey()) renderQuizPanel();
+      return;
+    }
+    if (Engine.atEnd()) {
+      Anim.settle(Engine.current());
+      Engine.pause();
+      return;
+    }
+    Engine.next();
+  }
   // ---------- the colour theme: an explicit choice, or whatever the system reports ----------
 
   const THEMES = [
@@ -602,17 +759,16 @@
 
   function advance() {
     if (!Engine.isPlaying()) return;
-    if (Engine.atEnd()) {
-      Anim.settle(Engine.current());
-      Engine.pause();
-      return;
-    }
-    Engine.next();
+    advanceStep();
   }
 
   function onEmit(step, index, total) {
     const playing = Engine.isPlaying();
     clearAdvance();
+    const stepChanged = step !== lastStep;
+    if (quizRun && (Engine.scenarioId !== quizRun.scenarioId || step !== quizRun.step)) quizRun = null;
+    if (closedBoundary && closedBoundary !== boundaryKey(index)) closedBoundary = null;
+    if (isModuleBoundary(index) && playing) { Engine.pause(); return; }
 
     // A different walkthrough, or a chapter drawn on its own canvas: rebuild the map, the packet
     // layer and the step list before painting this step.
@@ -632,11 +788,13 @@
     renderCaption(step, index, total);
     paintTicks(index);
 
-    const stepChanged = step !== lastStep;
     const speedChanged = Engine.speed !== lastSpeed;
     const startedPlaying = playing && !wasPlaying;
 
-    if (stepChanged) renderDetail(step, Engine.previous(), index);
+    if (stepChanged) {
+      renderDetail(step, Engine.previous(), index);
+      renderQuizPanel();
+    }
 
     if (stepChanged || speedChanged || startedPlaying) {
       lastStep = step;
@@ -649,11 +807,7 @@
 
     wasPlaying = playing;
 
-    document.getElementById('btn-prev').disabled = Engine.atStart();
-    document.getElementById('btn-next').disabled = Engine.atEnd();
-    const play = document.getElementById('btn-play');
-    play.textContent = playing ? '❙❙ Pause' : '▶ Play';
-    play.disabled = Engine.atEnd() && !playing;
+    syncTransport();
     document.getElementById('btn-speed').textContent = Engine.speed + '×';
     document.querySelectorAll('#phases .pip').forEach((p, i) => {
       p.classList.toggle('active', Engine.phases()[i] === step.phase);
@@ -716,8 +870,9 @@
     tickHost = document.getElementById('ticks');
     for (const id of ['btn-prev', 'btn-next', 'btn-play', 'btn-speed']) {
       document.getElementById(id).addEventListener('click', () => {
+        if (quizRun) return;
         if (id === 'btn-prev') { Engine.pause(); Engine.prev(); }
-        else if (id === 'btn-next') { Engine.pause(); Engine.next(); }
+        else if (id === 'btn-next') { Engine.pause(); advanceStep(); }
         else if (id === 'btn-play') Engine.toggle();
         else { clearAdvance(); Anim.stop(); lastSpeed = null; Engine.cycleSpeed(); }
       });
@@ -725,7 +880,8 @@
 
     document.addEventListener('keydown', (e) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
-      if (e.key === 'ArrowRight') { Engine.pause(); Engine.next(); e.preventDefault(); }
+      if (quizRun && ['ArrowRight', 'ArrowLeft', ' ', 'Home', 'End'].includes(e.key)) { e.preventDefault(); return; }
+      if (e.key === 'ArrowRight') { Engine.pause(); advanceStep(); e.preventDefault(); }
       else if (e.key === 'ArrowLeft') { Engine.pause(); Engine.prev(); e.preventDefault(); }
       else if (e.key === ' ') { Engine.toggle(); e.preventDefault(); }
       else if (e.key === 'Home') { Engine.pause(); Engine.go(0); e.preventDefault(); }
