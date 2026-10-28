@@ -6,10 +6,10 @@ Changing anything here means changing the engine in the same commit.
 ## 1. Layout & loading
 
 ```
-index.html                  script tags, in order, load everything
-src/ui.js                   DOM rendering
-src/anim.js                 the animation timeline: packet, wrapping, TTL badges, delivery mode
-src/engine.js               state machine, step navigation, hash routing
+index.html                  Vite entry
+src/scenarios.ts            imports schema.js and every data file, in order
+src/useJourney.ts           step state, playback, URL routing, theme, quiz
+src/anim.ts                 the animation timeline: packet, wrapping, TTL badges, delivery mode
 src/schema.js               NETV.addSteps / NETV.FIELDS / header catalogue
 data/scenario-http.js       nodes, links, constants, phase order
 data/http/1-boot.js         steps (this file owns "P0")
@@ -27,8 +27,9 @@ data/quizzes/ospf.js        ten OSPF quiz questions
 data/quizzes/bgp.js         ten BGP quiz questions
 ```
 
-Plain `<script>` tags, **not** ES modules: `file://` blocks module imports, and this page must
-open by double-click. Each step file ends with one call:
+The data files are still plain scripts with no imports: Vite evaluates them as side-effect modules,
+in the order `src/scenarios.ts` lists them, and they register themselves on the global `NETV`
+object. Each step file ends with one call:
 
 ```js
 NETV.addSteps('http', [ /* step objects, in order */ ]);

@@ -1,6 +1,6 @@
 # 0007 — Deploy as Workers static assets, with the repository root as the assets directory
 
-* Status: accepted
+* Status: superseded by [0019](0019-react-typescript-kumo.md)
 * Date: 2026-10-13
 * Deciders: user (asked how to run and deploy on Cloudflare)
 

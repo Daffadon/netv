@@ -1,6 +1,6 @@
 # 0005 — No build step: plain scripts, no ES modules, no dependencies
 
-* Status: accepted
+* Status: superseded by [0019](0019-react-typescript-kumo.md)
 * Date: 2026-10-13
 * Deciders: user (grilling round 1)
 

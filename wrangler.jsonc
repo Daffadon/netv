@@ -1,14 +1,13 @@
-// Cloudflare Workers static assets. No Worker script: every request is answered by a file here.
-// Deploy with: npx wrangler deploy
+// Cloudflare Workers static assets. Vite builds the site into dist/, and every request is answered
+// by a file there. Deploy with: npm run build && npx wrangler deploy
 // Docs: https://developers.cloudflare.com/workers/static-assets/
 {
   "name": "netv",
   // Set to the date of your first deploy. Changing it later can change runtime behaviour.
   "compatibility_date": "2026-10-13",
   "assets": {
-    // The site is the repository root, so the assets directory is "."
-    // (.assetsignore keeps docs/, tools/ and the repo files off the public site).
-    "directory": ".",
+    // Only the compiled site ships; source, docs, tools and node_modules stay out.
+    "directory": "dist",
     // Documented default: "/" serves index.html, "/file.html" redirects to "/file".
     "html_handling": "auto-trailing-slash"
   }

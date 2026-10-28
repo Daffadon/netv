@@ -1,11 +1,12 @@
 // Schema check for every scenario file. Run: node tools/validate.js
 // This is the safety net: it is the only thing preventing an invented RFC section, an
 // unknown header field, a step out of order or a missing step from reaching the page.
-const fs = require('fs');
-const path = require('path');
-const vm = require('vm');
+import fs from 'node:fs';
+import path from 'node:path';
+import vm from 'node:vm';
+import { fileURLToPath } from 'node:url';
 
-const root = path.join(__dirname, '..');
+const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SCENARIO_FILES = [
   'src/schema.js',
   'data/scenario-http.js',
@@ -21,10 +22,7 @@ const SCENARIO_FILES = [
   'data/quizzes/dns.js',
   'data/quizzes/http.js',
   'data/quizzes/ospf.js',
-  'data/quizzes/bgp.js',
-  'src/engine.js',
-  'src/anim.js',
-  'src/ui.js'
+  'data/quizzes/bgp.js'
 ];
 
 // From docs/data-schema.md §6. Verified against rfc-editor.org; do not add a section here
@@ -387,8 +385,12 @@ for (const scenarioId of Object.keys(SCENARIOS)) {
   }
 }
 
-// --- 6. index.html must load every source and data file that exists on disk
+// --- 6. the Vite entry must load the app, and the app must import every data file on disk
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+if (!html.includes('src="/src/main.tsx"')) err('index.html does not load src/main.tsx');
+const loader = fs.readFileSync(path.join(root, 'src/scenarios.ts'), 'utf8');
+if (!loader.includes("import './schema.js'")) err('src/scenarios.ts does not load src/schema.js');
+
 const onDisk = [];
 function collect(dir, rel) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -397,15 +399,14 @@ function collect(dir, rel) {
     else if (e.name.endsWith('.js')) onDisk.push(rel + '/' + e.name);
   }
 }
-collect(path.join(root, 'src'), 'src');
 collect(path.join(root, 'data'), 'data');
 
 for (const f of onDisk) {
   if (!SCENARIO_FILES.includes(f)) err('file exists but the validator never loads it: ' + f);
-  if (!html.includes('src="' + f + '"')) err('index.html does not load ' + f);
+  if (!loader.includes("import '../" + f + "'")) err('src/scenarios.ts does not import ' + f);
 }
 for (const f of SCENARIO_FILES) {
-  if (!f.startsWith('src/') && !f.startsWith('data/')) continue;
+  if (!f.startsWith('data/')) continue;
   if (!onDisk.includes(f)) err('validator loads a file that does not exist: ' + f);
 }
 

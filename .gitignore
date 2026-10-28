@@ -1,10 +1,9 @@
 # Development files that stay out of the repository. The published site is
-# unaffected by this file: wrangler reads .assetsignore, not this.
+# built into dist/, which Wrangler uploads instead of the repository root.
 
-# The optional smoke test (tools/smoke.mjs) needs jsdom, and the README says to
-# install it outside the tree so the page stays dependency-free. This only
-# catches an accidental in-tree install.
+# Installed packages and the Vite build output.
 node_modules/
+dist/
 
 # Wrangler's own state: the local caches under cache/, tmp/, and miniflare's
 # SQLite databases (cache, d1, kv, r2, observability) under state/v3/.
